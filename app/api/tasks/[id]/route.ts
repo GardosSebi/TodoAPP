@@ -34,6 +34,13 @@ export async function GET(
           select: {
             id: true,
             userId: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
             members: {
               where: {
                 userId: session.user.id,
@@ -46,6 +53,8 @@ export async function GET(
             id: true,
             name: true,
             color: true,
+            created_at: true,
+            updated_at: true,
           },
         },
         files: {
@@ -69,6 +78,9 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
+    // Check if current user is owner of the task's workspace
+    const isTaskWorkspaceOwner = task.workspace.userId === session.user.id
+
     // Format dates and files for API response
     const formattedTask = {
       ...task,
@@ -76,6 +88,16 @@ export async function GET(
       completed_at: task.completed_at?.toISOString() || null,
       created_at: task.created_at.toISOString(),
       updated_at: task.updated_at.toISOString(),
+      workspace: {
+        id: task.workspace.id,
+        userId: task.workspace.userId,
+        isOwner: isTaskWorkspaceOwner,
+        owner: task.workspace.user ? {
+          id: task.workspace.user.id,
+          name: task.workspace.user.name,
+          email: task.workspace.user.email,
+        } : null,
+      },
       project: task.project
         ? {
             ...task.project,
@@ -216,13 +238,7 @@ export async function PATCH(
       }
     }
     if (data.responsible !== undefined) {
-      // Only workspace owner can assign responsible person
-      if (!isWorkspaceOwner) {
-        return NextResponse.json(
-          { error: 'Only workspace owner can assign responsible person' },
-          { status: 403 }
-        )
-      }
+      // Any workspace member can assign responsible person
       updateData.responsible = data.responsible?.trim() || null
     }
 
@@ -326,11 +342,12 @@ export async function DELETE(
     }
 
     // Check access: user is task owner OR workspace owner OR workspace member
-    // But only task owner or workspace owner can delete
+    // All of them can delete tasks
     const isTaskOwner = task.userId === session.user.id
     const isWorkspaceOwner = task.workspace.userId === session.user.id
+    const isWorkspaceMember = task.workspace.members.length > 0
 
-    if (!isTaskOwner && !isWorkspaceOwner) {
+    if (!isTaskOwner && !isWorkspaceOwner && !isWorkspaceMember) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 

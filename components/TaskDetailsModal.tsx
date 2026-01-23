@@ -63,10 +63,78 @@ export default function TaskDetailsModal({
 
   const fetchWorkspaceMembers = async () => {
     try {
-      const res = await fetch('/api/workspace/members')
-      if (res.ok) {
-        const data = await res.json()
-        setWorkspaceMembers(data.members || [])
+      // First, get the task details to find its workspace and owner
+      const taskRes = await fetch(`/api/tasks/${task.id}`)
+      if (!taskRes.ok) {
+        // Fallback to current workspace members and owner
+        const workspaceRes = await fetch('/api/workspace')
+        const membersRes = await fetch('/api/workspace/members')
+        if (workspaceRes.ok && membersRes.ok) {
+          const workspaceData = await workspaceRes.json()
+          const membersData = await membersRes.json()
+          
+          const allMembers = [...(membersData.members || [])]
+          // Note: Current workspace API doesn't include owner in response, so we skip owner for fallback
+          setWorkspaceMembers(allMembers)
+        }
+        return
+      }
+      
+      const taskData = await taskRes.json()
+      const taskWorkspace = taskData.task.workspace
+      
+      if (!taskWorkspace) {
+        // Fallback to current workspace members
+        const membersRes = await fetch('/api/workspace/members')
+        if (membersRes.ok) {
+          const membersData = await membersRes.json()
+          setWorkspaceMembers(membersData.members || [])
+        }
+        return
+      }
+      
+      // Get current user's workspace info
+      const workspaceRes = await fetch('/api/workspace')
+      if (workspaceRes.ok) {
+        const workspaceData = await workspaceRes.json()
+        const currentWorkspaceId = workspaceData.workspace.id
+        
+        // Check if task is in current workspace
+        if (taskWorkspace.id === currentWorkspaceId) {
+          // Task is in current workspace, fetch members and add owner
+          const membersRes = await fetch('/api/workspace/members')
+          if (membersRes.ok) {
+            const membersData = await membersRes.json()
+            const allMembers = [...(membersData.members || [])]
+            
+            // Add owner from task workspace if available
+            if (taskWorkspace.owner) {
+              allMembers.unshift({
+                id: 'owner',
+                userId: taskWorkspace.owner.id,
+                role: 'OWNER',
+                user: taskWorkspace.owner,
+              })
+            }
+            
+            setWorkspaceMembers(allMembers)
+          }
+        } else {
+          // Task is in a different workspace
+          // Use owner from task workspace
+          const allMembers: WorkspaceMember[] = []
+          
+          if (taskWorkspace.owner) {
+            allMembers.push({
+              id: 'owner',
+              userId: taskWorkspace.owner.id,
+              role: 'OWNER',
+              user: taskWorkspace.owner,
+            })
+          }
+          
+          setWorkspaceMembers(allMembers)
+        }
       }
     } catch (error) {
       // Error fetching workspace members
@@ -75,11 +143,33 @@ export default function TaskDetailsModal({
 
   const checkWorkspaceOwnership = async () => {
     try {
-      const res = await fetch('/api/workspace')
-      if (res.ok) {
-        const data = await res.json()
-        setIsWorkspaceOwner(data.workspace.isOwner || false)
+      // Get task details to find its workspace and check ownership
+      const taskRes = await fetch(`/api/tasks/${task.id}`)
+      if (!taskRes.ok) {
+        // Fallback: check current workspace
+        const res = await fetch('/api/workspace')
+        if (res.ok) {
+          const data = await res.json()
+          setIsWorkspaceOwner(data.workspace.isOwner || false)
+        }
+        return
       }
+      
+      const taskData = await taskRes.json()
+      const taskWorkspace = taskData.task.workspace
+      
+      if (!taskWorkspace) {
+        // Fallback: check current workspace
+        const res = await fetch('/api/workspace')
+        if (res.ok) {
+          const data = await res.json()
+          setIsWorkspaceOwner(data.workspace.isOwner || false)
+        }
+        return
+      }
+      
+      // Use the isOwner flag from the task's workspace
+      setIsWorkspaceOwner(taskWorkspace.isOwner || false)
     } catch (error) {
       // Error checking workspace ownership
     }
@@ -255,40 +345,24 @@ export default function TaskDetailsModal({
                 </select>
               </div>
 
-              {isWorkspaceOwner && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Responsabil
-                  </label>
-                  <select
-                    value={responsible}
-                    onChange={(e) => setResponsible(e.target.value)}
-                    className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Fără responsabil</option>
-                    {workspaceMembers.map((member) => (
-                      <option key={member.userId} value={member.user.name}>
-                        {member.user.name} {member.role === 'OWNER' ? '(Owner)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {!isWorkspaceOwner && task.responsible && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Responsabil
-                  </label>
-                  <div className="w-full px-3 py-2 text-black dark:text-white bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-                    {task.responsible}
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Doar owner-ul workspace-ului poate atribui responsabil
-                  </p>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Responsabil
+                </label>
+                <select
+                  value={responsible}
+                  onChange={(e) => setResponsible(e.target.value)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Fără responsabil</option>
+                  {workspaceMembers.map((member) => (
+                    <option key={member.userId} value={member.user.name}>
+                      {member.user.name} {member.role === 'OWNER' ? '(Owner)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
