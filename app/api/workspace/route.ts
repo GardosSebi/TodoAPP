@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Get workspace - either owned or as member
     let workspace = user?.workspace
-    if (!workspace && user?.workspaceMemberships.length > 0) {
+    if (!workspace && user && user.workspaceMemberships && user.workspaceMemberships.length > 0) {
       workspace = user.workspaceMemberships[0].workspace
     }
 

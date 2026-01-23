@@ -152,7 +152,7 @@ export default function KanbanBoard({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       draggable={true}
-                      onDragStart={(e) => handleDragStart(e, task)}
+                      onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, task)}
                       onDragEnd={handleDragEnd}
                       onClick={(e) => {
                         // Only trigger click if we didn't just drag

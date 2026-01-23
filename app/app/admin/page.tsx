@@ -37,6 +37,13 @@ export default async function AdminPage() {
     },
   })
 
-  return <AdminClient initialUsers={users} />
+  // Convert Date objects to ISO strings for the client component
+  const usersWithStringDates = users.map((user) => ({
+    ...user,
+    created_at: user.created_at.toISOString(),
+    updated_at: user.updated_at.toISOString(),
+  }))
+
+  return <AdminClient initialUsers={usersWithStringDates} />
 }
 
