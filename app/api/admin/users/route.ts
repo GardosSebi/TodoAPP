@@ -7,6 +7,7 @@ import { z } from 'zod'
 
 const createUserSchema = z.object({
   email: z.string().email(),
+  name: z.string().trim().min(1).max(100).optional(),
   password: z.string().min(8).optional(),
   sendInvitation: z.boolean().default(false),
 })
@@ -107,6 +108,9 @@ export async function POST(request: NextRequest) {
       password = generateRandomPassword()
     }
 
+    // Generate name from email if not provided
+    const name = data.name || data.email.split('@')[0]
+
     const password_hash = await hash(password)
 
     // Create workspace and user in a transaction
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
       // Create workspace first
       const workspace = await tx.workspace.create({
         data: {
-          name: `${data.email.split('@')[0]}'s Workspace`, // Use email prefix as name
+          name: `${name}'s Workspace`, // Use name for workspace
         },
       })
 
@@ -122,6 +126,7 @@ export async function POST(request: NextRequest) {
       const newUser = await tx.user.create({
         data: {
           email: data.email,
+          name: name.trim(),
           password_hash,
           role: 'USER',
           workspaceId: workspace.id,
@@ -129,6 +134,7 @@ export async function POST(request: NextRequest) {
         select: {
           id: true,
           email: true,
+          name: true,
           role: true,
           created_at: true,
         },

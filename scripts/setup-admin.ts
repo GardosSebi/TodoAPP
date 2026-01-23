@@ -16,6 +16,12 @@ function question(query: string): Promise<string> {
 async function setupAdmin() {
   try {
     const email = 'sebi.gardos@verticaldigital.ca'
+    // Generate name from email (convert "sebi.gardos" to "Sebi Gardos")
+    const nameFromEmail = email.split('@')[0]
+      .split('.')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+    const defaultName = nameFromEmail || email.split('@')[0]
     
     // Check if admin already exists
     const existingAdmin = await prisma.user.findUnique({
@@ -61,12 +67,31 @@ async function setupAdmin() {
 
       const password_hash = await hash(password)
       
-      await prisma.user.create({
-        data: {
-          email,
-          password_hash,
-          role: 'ADMIN',
-        },
+      // Create workspace and user in a transaction
+      await prisma.$transaction(async (tx) => {
+        // Create workspace first
+        const workspace = await tx.workspace.create({
+          data: {
+            name: `${defaultName}'s Workspace`,
+          },
+        })
+
+        // Create user with workspace
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            name: defaultName,
+            password_hash,
+            role: 'ADMIN',
+            workspaceId: workspace.id,
+          },
+        })
+
+        // Update workspace with userId
+        await tx.workspace.update({
+          where: { id: workspace.id },
+          data: { userId: newUser.id },
+        })
       })
     }
 
