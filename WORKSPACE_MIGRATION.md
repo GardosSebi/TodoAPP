@@ -40,7 +40,7 @@ npx tsx scripts/migrate-workspaces.ts
 This script will:
 - Find all users without workspaces
 - Create a workspace for each user (named "{User's Name}'s Workspace")
-- Update all user's projects to belong to their workspace
+- Update all usser's projects to belong to their workspace
 - Update all user's tasks to belong to their workspace
 
 ### 3. Verify Migration
