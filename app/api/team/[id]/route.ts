@@ -5,9 +5,10 @@ import { prisma } from '@/lib/prisma'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -26,7 +27,7 @@ export async function DELETE(
     // Verify the team member belongs to this admin
     const teamMember = await prisma.teamMember.findFirst({
       where: {
-        id: params.id,
+        id,
         adminId: session.user.id,
       },
     })
@@ -36,7 +37,7 @@ export async function DELETE(
     }
 
     await prisma.teamMember.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

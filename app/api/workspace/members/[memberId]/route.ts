@@ -6,9 +6,10 @@ import { prisma } from '@/lib/prisma'
 // Remove member from workspace
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { memberId: string } }
+  { params }: { params: Promise<{ memberId: string }> }
 ) {
   try {
+    const { memberId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,7 +17,7 @@ export async function DELETE(
 
     // Get member
     const member = await prisma.workspaceMember.findUnique({
-      where: { id: params.memberId },
+      where: { id: memberId },
       include: {
         workspace: true,
       },
@@ -38,7 +39,7 @@ export async function DELETE(
     }
 
     await prisma.workspaceMember.delete({
-      where: { id: params.memberId },
+      where: { id: memberId },
     })
 
     return NextResponse.json({ success: true })

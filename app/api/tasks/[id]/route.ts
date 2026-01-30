@@ -16,9 +16,10 @@ const updateTaskSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,7 +28,7 @@ export async function GET(
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -123,9 +124,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -137,7 +139,7 @@ export async function PATCH(
     // Get task and check workspace access
     const existingTask = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -243,7 +245,7 @@ export async function PATCH(
     }
 
     const task = await prisma.task.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         project: {
@@ -309,9 +311,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -320,7 +323,7 @@ export async function DELETE(
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -352,7 +355,7 @@ export async function DELETE(
     }
 
     await prisma.task.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

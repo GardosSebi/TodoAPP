@@ -6,9 +6,10 @@ import { prisma } from '@/lib/prisma'
 // Remove member from project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; memberId: string } }
+  { params }: { params: Promise<{ id: string; memberId: string }> }
 ) {
   try {
+    const { id, memberId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -17,7 +18,7 @@ export async function DELETE(
     // Verify user owns the project
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     })
@@ -31,8 +32,8 @@ export async function DELETE(
 
     const member = await prisma.projectMember.findFirst({
       where: {
-        id: params.memberId,
-        projectId: params.id,
+        id: memberId,
+        projectId: id,
       },
     })
 
@@ -44,7 +45,7 @@ export async function DELETE(
     }
 
     await prisma.projectMember.delete({
-      where: { id: params.memberId },
+      where: { id: memberId },
     })
 
     return NextResponse.json({ success: true })

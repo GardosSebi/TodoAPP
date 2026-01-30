@@ -6,15 +6,14 @@ import { prisma } from '@/lib/prisma'
 // Accept invitation
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ invitationId: string }> | { invitationId: string } }
+  { params }: { params: Promise<{ invitationId: string }> }
 ) {
   try {
+    const { invitationId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { invitationId } = await Promise.resolve(params)
 
     const invitation = await prisma.workspaceInvitation.findUnique({
       where: { id: invitationId },
@@ -91,15 +90,14 @@ export async function POST(
 // Deny invitation
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ invitationId: string }> | { invitationId: string } }
+  { params }: { params: Promise<{ invitationId: string }> }
 ) {
   try {
+    const { invitationId } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { invitationId } = await Promise.resolve(params)
 
     const invitation = await prisma.workspaceInvitation.findUnique({
       where: { id: invitationId },

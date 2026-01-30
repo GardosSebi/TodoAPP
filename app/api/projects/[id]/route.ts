@@ -11,9 +11,10 @@ const updateProjectSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -26,7 +27,7 @@ export async function PATCH(
     // But only project owner can edit
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -73,7 +74,7 @@ export async function PATCH(
     }
 
     const updatedProject = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     })
 
@@ -96,9 +97,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -107,7 +109,7 @@ export async function DELETE(
     // Only project owner can delete
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     })
@@ -117,7 +119,7 @@ export async function DELETE(
     }
 
     await prisma.project.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
