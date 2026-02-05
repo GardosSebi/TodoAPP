@@ -16,25 +16,38 @@ export default function TodayClient({ initialTasks, monthTasks }: TodayClientPro
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   // Fetch all tasks with due dates when needed
+  const fetchAllTasks = async () => {
+    try {
+      const res = await fetch('/api/tasks')
+      if (res.ok) {
+        const data = await res.json()
+        // Filter to only tasks with due dates
+        const tasksWithDueDates = (data.tasks || []).filter(
+          (task: Task) => task.due_at !== null
+        )
+        setAllMonthTasks(tasksWithDueDates)
+      }
+    } catch (error) {
+      // Error('Error fetching tasks for calendar:', error)
+    }
+  }
+
   useEffect(() => {
-    const fetchAllTasks = async () => {
-      try {
-        const res = await fetch('/api/tasks')
-        if (res.ok) {
-          const data = await res.json()
-          // Filter to only tasks with due dates
-          const tasksWithDueDates = (data.tasks || []).filter(
-            (task: Task) => task.due_at !== null
-          )
-          setAllMonthTasks(tasksWithDueDates)
-        }
-      } catch (error) {
-        // Error('Error fetching tasks for calendar:', error)
+    // Fetch on mount to ensure we have all tasks
+    fetchAllTasks()
+
+    // Refetch when page becomes visible (handles project deletion in other tabs)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAllTasks()
       }
     }
 
-    // Fetch on mount to ensure we have all tasks
-    fetchAllTasks()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   // Sync initialTasks when they change (e.g., on page refresh)

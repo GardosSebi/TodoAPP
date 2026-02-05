@@ -118,6 +118,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 })
     }
 
+    // Delete all tasks associated with this project
+    await prisma.task.deleteMany({
+      where: { projectId: id },
+    })
+
+    // Delete the project
     await prisma.project.delete({
       where: { id },
     })

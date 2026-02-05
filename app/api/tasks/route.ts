@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 const taskSchema = z.object({
   title: z.string().trim().min(1).max(120),
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(),
   due_at: z.string().datetime().optional().nullable(),
   priority: z.number().int().min(0).max(3),
   projectId: z.string().uuid().optional().nullable(),
