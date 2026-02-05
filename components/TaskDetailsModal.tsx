@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Dialog } from '@headlessui/react'
-import { X, Calendar, Flag, FileText, Upload, Image as ImageIcon, File, Trash2, User } from 'lucide-react'
-import { Task, TaskFile } from '@/types'
+import { X, Calendar, Flag, FileText, Upload, Image as ImageIcon, File, Trash2, User, Check, Plus, Tag as TagIcon } from 'lucide-react'
+import { Task, TaskFile, SubTask, Tag } from '@/types'
 import { formatDate } from '@/lib/utils'
 import CommentsSection from './CommentsSection'
 
@@ -43,6 +43,15 @@ export default function TaskDetailsModal({
   const [isUploading, setIsUploading] = useState(false)
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([])
   const [isWorkspaceOwner, setIsWorkspaceOwner] = useState(false)
+  const [subtasks, setSubtasks] = useState<SubTask[]>(task.subtasks || [])
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false)
+  const [tags, setTags] = useState<Tag[]>(task.tags || [])
+  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState('#3b82f6')
+  const [isCreatingTag, setIsCreatingTag] = useState(false)
+  const [showTagInput, setShowTagInput] = useState(false)
 
   useEffect(() => {
     setTitle(task.title)
@@ -53,9 +62,12 @@ export default function TaskDetailsModal({
     setPriority(task.priority)
     setResponsible(task.responsible || '')
     setFiles(task.files || [])
-    // Fetch files and workspace members when modal opens
+    // Fetch files, subtasks, tags and workspace members when modal opens
     if (task.id) {
       fetchFiles()
+      fetchSubtasks()
+      fetchTags()
+      fetchAvailableTags()
       fetchWorkspaceMembers()
       checkWorkspaceOwnership()
     }
@@ -195,6 +207,249 @@ export default function TaskDetailsModal({
       setFiles(task.files || [])
     }
   }
+
+  const fetchSubtasks = async () => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks`)
+      if (res.ok) {
+        const data = await res.json()
+        setSubtasks(data.subtasks || [])
+      } else {
+        // If endpoint returns error, just use subtasks from task prop
+        setSubtasks(task.subtasks || [])
+      }
+    } catch (error) {
+      // Error fetching subtasks
+      setSubtasks(task.subtasks || [])
+    }
+  }
+
+  const handleAddSubtask = async () => {
+    if (!newSubtaskTitle.trim()) return
+
+    setIsAddingSubtask(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newSubtaskTitle.trim(),
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setSubtasks([...subtasks, data.subtask])
+        setNewSubtaskTitle('')
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Eroare la adăugarea subsarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la adăugarea subsarcinii')
+    } finally {
+      setIsAddingSubtask(false)
+    }
+  }
+
+  const handleToggleSubtask = async (subtaskId: string, completed: boolean) => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completed: !completed,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setSubtasks(subtasks.map((st) => (st.id === subtaskId ? data.subtask : st)))
+      } else {
+        alert('Eroare la actualizarea subsarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la actualizarea subsarcinii')
+    }
+  }
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    if (!confirm('Ești sigur că vrei să ștergi această subsarcină?')) return
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks/${subtaskId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setSubtasks(subtasks.filter((st) => st.id !== subtaskId))
+      } else {
+        alert('Eroare la ștergerea subsarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la ștergerea subsarcinii')
+    }
+  }
+
+  const handleUpdateSubtaskTitle = async (subtaskId: string, newTitle: string) => {
+    if (!newTitle.trim()) return
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/subtasks/${subtaskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setSubtasks(subtasks.map((st) => (st.id === subtaskId ? data.subtask : st)))
+      } else {
+        alert('Eroare la actualizarea subsarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la actualizarea subsarcinii')
+    }
+  }
+
+  // Calculate progress based on completed subtasks
+  const subtaskProgress = subtasks.length > 0
+    ? Math.round((subtasks.filter((st) => st.completed).length / subtasks.length) * 100)
+    : 0
+
+  const fetchTags = async () => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/tags`)
+      if (res.ok) {
+        const data = await res.json()
+        setTags(data.tags || [])
+      } else {
+        setTags(task.tags || [])
+      }
+    } catch (error) {
+      setTags(task.tags || [])
+    }
+  }
+
+  const fetchAvailableTags = async () => {
+    try {
+      const res = await fetch('/api/tags')
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableTags(data.tags || [])
+      }
+    } catch (error) {
+      // Error fetching available tags
+    }
+  }
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return
+
+    setIsCreatingTag(true)
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newTagName.trim(),
+          color: newTagColor,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableTags([...availableTags, data.tag])
+        // Automatically add the new tag to the task
+        await handleAddTagToTask(data.tag.id)
+        setNewTagName('')
+        setShowTagInput(false)
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Eroare la crearea etichetei')
+      }
+    } catch (error) {
+      alert('Eroare la crearea etichetei')
+    } finally {
+      setIsCreatingTag(false)
+    }
+  }
+
+  const handleAddTagToTask = async (tagId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/tags`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tagId }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setTags([...tags, data.tag])
+        // Refresh available tags to update the list
+        await fetchAvailableTags()
+      } else {
+        const error = await res.json()
+        if (error.error !== 'Tag already assigned to task') {
+          alert(error.error || 'Eroare la adăugarea etichetei')
+        }
+      }
+    } catch (error) {
+      alert('Eroare la adăugarea etichetei')
+    }
+  }
+
+  const handleRemoveTagFromTask = async (tagId: string) => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/tags/${tagId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setTags(tags.filter((t) => t.id !== tagId))
+      } else {
+        alert('Eroare la eliminarea etichetei')
+      }
+    } catch (error) {
+      alert('Eroare la eliminarea etichetei')
+    }
+  }
+
+  const handleDeleteTag = async (tagId: string) => {
+    if (!confirm('Ești sigur că vrei să ștergi această etichetă? Va fi eliminată de la toate sarcinile.')) return
+
+    try {
+      const res = await fetch(`/api/tags/${tagId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        setAvailableTags(availableTags.filter((t) => t.id !== tagId))
+        setTags(tags.filter((t) => t.id !== tagId))
+      } else {
+        alert('Eroare la ștergerea etichetei')
+      }
+    } catch (error) {
+      alert('Eroare la ștergerea etichetei')
+    }
+  }
+
+  // Get tags that are not already assigned to the task
+  const unassignedTags = availableTags.filter(
+    (tag) => !tags.some((taskTag) => taskTag.id === tag.id)
+  )
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -378,6 +633,208 @@ export default function TaskDetailsModal({
                 />
               </div>
 
+              {/* Subtasks Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  Subsarcini
+                  {subtasks.length > 0 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+                      {subtasks.filter((st) => st.completed).length} / {subtasks.length}
+                    </span>
+                  )}
+                </label>
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                  {/* Progress Bar */}
+                  {subtasks.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Progres</span>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {subtaskProgress}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${subtaskProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Subtask Input */}
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddSubtask()
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Adaugă o subsarcină..."
+                      disabled={isAddingSubtask}
+                    />
+                    <button
+                      onClick={handleAddSubtask}
+                      disabled={isAddingSubtask || !newSubtaskTitle.trim()}
+                      className="px-3 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Subtasks List */}
+                  {subtasks.length > 0 && (
+                    <div className="space-y-2">
+                      {subtasks.map((subtask) => (
+                        <SubtaskItem
+                          key={subtask.id}
+                          subtask={subtask}
+                          onToggle={() => handleToggleSubtask(subtask.id, subtask.completed)}
+                          onDelete={() => handleDeleteSubtask(subtask.id)}
+                          onUpdateTitle={(newTitle) => handleUpdateSubtaskTitle(subtask.id, newTitle)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tags Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <TagIcon className="w-4 h-4" />
+                  Etichete
+                </label>
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                  {/* Current Tags */}
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-white"
+                          style={{ backgroundColor: tag.color }}
+                        >
+                          {tag.name}
+                          <button
+                            onClick={() => handleRemoveTagFromTask(tag.id)}
+                            className="hover:bg-black/20 rounded p-0.5 transition-colors"
+                            title="Elimină etichetă"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add Tag Dropdown */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddTagToTask(e.target.value)
+                            e.target.value = ''
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Selectează o etichetă...</option>
+                        {unassignedTags.map((tag) => (
+                          <option key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setShowTagInput(!showTagInput)}
+                        className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Create New Tag Input */}
+                    {showTagInput && (
+                      <div className="flex gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600">
+                        <input
+                          type="text"
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          placeholder="Nume etichetă"
+                          className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleCreateTag()
+                            }
+                          }}
+                        />
+                        <input
+                          type="color"
+                          value={newTagColor}
+                          onChange={(e) => setNewTagColor(e.target.value)}
+                          className="w-12 h-10 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                          title="Selectează culoarea"
+                        />
+                        <button
+                          onClick={handleCreateTag}
+                          disabled={isCreatingTag || !newTagName.trim()}
+                          className="px-3 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isCreatingTag ? '...' : 'Creează'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowTagInput(false)
+                            setNewTagName('')
+                            setNewTagColor('#3b82f6')
+                          }}
+                          className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Available Tags List (for management) */}
+                    {availableTags.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-600">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Etichete disponibile:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {availableTags.map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium"
+                              style={{
+                                backgroundColor: `${tag.color}20`,
+                                color: tag.color,
+                                border: `1px solid ${tag.color}40`,
+                              }}
+                            >
+                              {tag.name}
+                              <button
+                                onClick={() => handleDeleteTag(tag.id)}
+                                className="hover:bg-black/10 rounded p-0.5 transition-colors"
+                                title="Șterge etichetă"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <Upload className="w-4 h-4" />
@@ -487,6 +944,100 @@ export default function TaskDetailsModal({
         </Dialog.Panel>
       </div>
     </Dialog>
+  )
+}
+
+// SubtaskItem Component
+interface SubtaskItemProps {
+  subtask: SubTask
+  onToggle: () => void
+  onDelete: () => void
+  onUpdateTitle: (newTitle: string) => void
+}
+
+function SubtaskItem({ subtask, onToggle, onDelete, onUpdateTitle }: SubtaskItemProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(subtask.title)
+
+  useEffect(() => {
+    setEditTitle(subtask.title)
+  }, [subtask.title])
+
+  const handleSave = () => {
+    if (editTitle.trim() && editTitle.trim() !== subtask.title) {
+      onUpdateTitle(editTitle.trim())
+    }
+    setIsEditing(false)
+  }
+
+  const handleCancel = () => {
+    setEditTitle(subtask.title)
+    setIsEditing(false)
+  }
+
+  return (
+    <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 group">
+      <button
+        onClick={onToggle}
+        className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+          subtask.completed
+            ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500'
+            : 'border-gray-300 dark:border-gray-600 hover:border-blue-500'
+        }`}
+      >
+        {subtask.completed && <Check className="w-3 h-3 text-white" />}
+      </button>
+      {isEditing ? (
+        <div className="flex-1 flex gap-2">
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleSave()
+              } else if (e.key === 'Escape') {
+                handleCancel()
+              }
+            }}
+            className="flex-1 px-2 py-1 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            autoFocus
+          />
+          <button
+            onClick={handleSave}
+            className="px-2 py-1 text-xs bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-600"
+          >
+            Salvează
+          </button>
+          <button
+            onClick={handleCancel}
+            className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
+          >
+            Anulează
+          </button>
+        </div>
+      ) : (
+        <>
+          <span
+            onClick={() => setIsEditing(true)}
+            className={`flex-1 text-sm cursor-pointer ${
+              subtask.completed
+                ? 'line-through text-gray-500 dark:text-gray-400'
+                : 'text-gray-900 dark:text-white'
+            }`}
+          >
+            {subtask.title}
+          </span>
+          <button
+            onClick={onDelete}
+            className="flex-shrink-0 p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Șterge subsarcină"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 

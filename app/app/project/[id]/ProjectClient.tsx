@@ -5,7 +5,7 @@ import QuickAddTask from '@/components/QuickAddTask'
 import TaskDetailsModal from '@/components/TaskDetailsModal'
 import SearchBar from '@/components/SearchBar'
 import AdvancedFilters from '@/components/AdvancedFilters'
-import { Task } from '@/types'
+import { Task, Tag } from '@/types'
 import { useState, useEffect } from 'react'
 
 interface ProjectClientProps {
@@ -21,10 +21,12 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   const [filters, setFilters] = useState<any>({})
   const [projects, setProjects] = useState<any[]>([])
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
 
   useEffect(() => {
     fetchProjects()
     fetchWorkspaceMembers()
+    fetchTags()
   }, [])
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
         setProjects(data.projects || [])
       }
     } catch (error) {
-      console.error('Error fetching projects:', error)
+      // Error fetching projects
     }
   }
 
@@ -51,7 +53,19 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
         setWorkspaceMembers(data.members || [])
       }
     } catch (error) {
-      console.error('Error fetching workspace members:', error)
+      // Error fetching workspace members
+    }
+  }
+
+  const fetchTags = async () => {
+    try {
+      const res = await fetch('/api/tags')
+      if (res.ok) {
+        const data = await res.json()
+        setTags(data.tags || [])
+      }
+    } catch (error) {
+      // Error fetching tags
     }
   }
 
@@ -96,6 +110,16 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
           if (taskDate > toDate) return false
         }
         return true
+      })
+    }
+
+    // Apply tags filter
+    if (filters.tagIds && filters.tagIds.length > 0) {
+      filtered = filtered.filter((task) => {
+        if (!task.tags || task.tags.length === 0) return false
+        const taskTagIds = task.tags.map((tag) => tag.id)
+        // Task must have at least one of the selected tags
+        return filters.tagIds.some((tagId: string) => taskTagIds.includes(tagId))
       })
     }
 
@@ -213,6 +237,7 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
             onFiltersChange={setFilters}
             projects={projects}
             workspaceMembers={workspaceMembers}
+            tags={tags}
           />
         </div>
       </div>

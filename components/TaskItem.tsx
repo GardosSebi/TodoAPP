@@ -130,7 +130,26 @@ export default function TaskItem({ task, onUpdate, onDelete, onClick }: TaskItem
                 {task.responsible}
               </span>
             )}
+            {task.subtasks && task.subtasks.length > 0 && (
+              <span className="text-xs flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                <Check className="w-3 h-3" />
+                {task.subtasks.filter((st) => st.completed).length}/{task.subtasks.length}
+              </span>
+            )}
           </div>
+          {task.tags && task.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {task.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium text-white"
+                  style={{ backgroundColor: tag.color }}
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <button

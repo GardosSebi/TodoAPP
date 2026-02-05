@@ -78,7 +78,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ activities: formattedActivities })
   } catch (error) {
-    console.error('Error fetching activities:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

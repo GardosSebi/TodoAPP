@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Filter, X, Save, Trash2, Calendar, Flag, User } from 'lucide-react'
-import { Task } from '@/types'
+import { Filter, X, Save, Trash2, Calendar, Flag, User, Tag as TagIcon } from 'lucide-react'
+import { Task, Tag } from '@/types'
 
 interface FilterOptions {
   search?: string
@@ -12,6 +12,7 @@ interface FilterOptions {
   projectId?: string
   dateFrom?: string
   dateTo?: string
+  tagIds?: string[]
 }
 
 interface FilterPreset {
@@ -25,12 +26,14 @@ interface AdvancedFiltersProps {
   onFiltersChange: (filters: FilterOptions) => void
   projects?: Array<{ id: string; name: string; color?: string | null }>
   workspaceMembers?: Array<{ user: { name: string } }>
+  tags?: Tag[]
 }
 
 export default function AdvancedFilters({
   onFiltersChange,
   projects = [],
   workspaceMembers = [],
+  tags = [],
 }: AdvancedFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [filters, setFilters] = useState<FilterOptions>({})
@@ -54,7 +57,7 @@ export default function AdvancedFilters({
         setPresets(data.presets || [])
       }
     } catch (error) {
-      console.error('Error fetching presets:', error)
+      // Error fetching presets
     }
   }
 
@@ -88,7 +91,7 @@ export default function AdvancedFilters({
         setShowSavePreset(false)
       }
     } catch (error) {
-      console.error('Error saving preset:', error)
+      // Error saving preset
     }
   }
 
@@ -108,7 +111,7 @@ export default function AdvancedFilters({
         await fetchPresets()
       }
     } catch (error) {
-      console.error('Error deleting preset:', error)
+      // Error deleting preset
     }
   }
 
@@ -245,6 +248,49 @@ export default function AdvancedFilters({
                 />
               </div>
             </div>
+
+            {/* Tags Filter */}
+            {tags.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <TagIcon className="w-4 h-4" />
+                  Etichete
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const isSelected = filters.tagIds?.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => {
+                          const currentTagIds = filters.tagIds || []
+                          const newTagIds = isSelected
+                            ? currentTagIds.filter((id) => id !== tag.id)
+                            : [...currentTagIds, tag.id]
+                          handleFilterChange('tagIds', newTagIds.length > 0 ? newTagIds : undefined)
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'text-white'
+                            : 'text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                        style={
+                          isSelected
+                            ? { backgroundColor: tag.color }
+                            : {
+                                backgroundColor: `${tag.color}20`,
+                                color: tag.color,
+                                borderColor: `${tag.color}40`,
+                              }
+                        }
+                      >
+                        {tag.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">

@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const responsible = searchParams.get('responsible') // Responsible person filter
     const dateFrom = searchParams.get('dateFrom') // Date range start
     const dateTo = searchParams.get('dateTo') // Date range end
+    const tagIds = searchParams.get('tagIds') // Comma-separated tag IDs
 
     // Get workspaces where user is owner or member
     const userWorkspaces = await prisma.workspace.findMany({
@@ -128,6 +129,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Filter by tags
+    if (tagIds) {
+      const tagIdArray = tagIds.split(',').filter((id) => id.trim())
+      if (tagIdArray.length > 0) {
+        where.tags = {
+          some: {
+            tagId: { in: tagIdArray },
+          },
+        }
+      }
+    }
+
     const tasks = await prisma.task.findMany({
       where,
       include: {
@@ -144,6 +157,17 @@ export async function GET(request: NextRequest) {
         files: {
           orderBy: {
             uploaded_at: 'desc',
+          },
+        },
+        subtasks: {
+          orderBy: [
+            { order: 'asc' },
+            { created_at: 'asc' },
+          ],
+        },
+        tags: {
+          include: {
+            tag: true,
           },
         },
       } as any,
@@ -171,6 +195,19 @@ export async function GET(request: NextRequest) {
       files: (task.files || []).map((file: any) => ({
         ...file,
         uploaded_at: file.uploaded_at.toISOString(),
+      })),
+      subtasks: (task.subtasks || []).map((subtask: any) => ({
+        ...subtask,
+        created_at: subtask.created_at.toISOString(),
+        updated_at: subtask.updated_at.toISOString(),
+        completed_at: subtask.completed_at?.toISOString() || null,
+      })),
+      tags: (task.tags || []).map((taskTag: any) => ({
+        id: taskTag.tag.id,
+        name: taskTag.tag.name,
+        color: taskTag.tag.color,
+        created_at: taskTag.tag.created_at.toISOString(),
+        updated_at: taskTag.tag.updated_at.toISOString(),
       })),
     }))
 
@@ -300,6 +337,17 @@ export async function POST(request: NextRequest) {
             uploaded_at: 'desc',
           },
         },
+        subtasks: {
+          orderBy: [
+            { order: 'asc' },
+            { created_at: 'asc' },
+          ],
+        },
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
       } as any,
     })
 
@@ -321,6 +369,19 @@ export async function POST(request: NextRequest) {
       files: (taskWithFiles.files || []).map((file: any) => ({
         ...file,
         uploaded_at: file.uploaded_at.toISOString(),
+      })),
+      subtasks: (taskWithFiles.subtasks || []).map((subtask: any) => ({
+        ...subtask,
+        created_at: subtask.created_at.toISOString(),
+        updated_at: subtask.updated_at.toISOString(),
+        completed_at: subtask.completed_at?.toISOString() || null,
+      })),
+      tags: (taskWithFiles.tags || []).map((taskTag: any) => ({
+        id: taskTag.tag.id,
+        name: taskTag.tag.name,
+        color: taskTag.tag.color,
+        created_at: taskTag.tag.created_at.toISOString(),
+        updated_at: taskTag.tag.updated_at.toISOString(),
       })),
     }
 

@@ -17,6 +17,7 @@ import {
   MoonIcon,
   X,
   Menu,
+  BarChart3,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import TeamManagement from './TeamManagement'
@@ -154,6 +155,7 @@ export default function Sidebar() {
 
   const navItems = [
     { href: '/app', label: 'Primite', icon: InboxIcon },
+    { href: '/app/dashboard', label: 'Dashboard', icon: BarChart3 },
     { href: '/app/today', label: 'Calendar', icon: CalendarIcon },
     { href: '/app/upcoming', label: 'Viitoare', icon: ClockIcon },
     { href: '/app/completed', label: 'Finalizate', icon: CheckCircleIcon },

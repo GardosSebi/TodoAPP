@@ -61,6 +61,7 @@ model Workspace {
   members    WorkspaceMember[]
   invitations WorkspaceInvitation[]
   activities Activity[]
+  tags       Tag[]
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -161,8 +162,10 @@ model Task {
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project      Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   files        TaskFile[]
+  subtasks     SubTask[]
   comments     Comment[]
   activities   Activity[]
+  tags         TaskTag[]
 
   @@index([userId])
   @@index([workspaceId])
@@ -183,6 +186,21 @@ model TaskFile {
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+}
+
+model SubTask {
+  id           String   @id @default(uuid())
+  taskId       String
+  title        String   @db.VarChar(200)
+  completed    Boolean  @default(false)
+  order        Int      @default(0) // For ordering subtasks
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  completed_at DateTime?
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([completed])
 }
 
 model Comment {
@@ -249,5 +267,33 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([created_at])
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String   @db.VarChar(50)
+  color       String   @default("#3b82f6") // Hex color code
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       TaskTag[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([name])
+}
+
+model TaskTag {
+  id        String   @id @default(uuid())
+  taskId   String
+  tagId    String
+  created_at DateTime @default(now())
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, tagId])
+  @@index([taskId])
+  @@index([tagId])
 }
 

@@ -67,7 +67,7 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
           setIsOpen(true)
         }
       } catch (error) {
-        console.error('Search error:', error)
+        // Search error
       } finally {
         setIsSearching(false)
       }

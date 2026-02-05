@@ -83,7 +83,7 @@ export default function ActivityFeed({
         setActivities(data.activities || [])
       }
     } catch (error) {
-      console.error('Error fetching activities:', error)
+      // Error fetching activities
     } finally {
       setIsLoading(false)
     }

@@ -32,7 +32,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ notifications: formattedNotifications })
   } catch (error) {
-    console.error('Error fetching notifications:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -67,7 +66,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error updating notifications:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

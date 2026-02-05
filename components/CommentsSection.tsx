@@ -80,7 +80,7 @@ export default function CommentsSection({
         setComments(data.comments || [])
       }
     } catch (error) {
-      console.error('Error fetching comments:', error)
+      // Error fetching comments
     } finally {
       setIsLoading(false)
     }
@@ -148,7 +148,6 @@ export default function CommentsSection({
         alert(error.error || 'Eroare la adăugarea comentariului')
       }
     } catch (error) {
-      console.error('Error submitting comment:', error)
       alert('Eroare la adăugarea comentariului')
     } finally {
       setIsSubmitting(false)

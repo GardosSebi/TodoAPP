@@ -15,32 +15,22 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
-  // Initialize theme from localStorage
+  // Ensure no theme is applied on initial load
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
-    const initialTheme = savedTheme || 'dark'
-    setTheme(initialTheme)
-    if (initialTheme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    document.documentElement.classList.remove('dark')
   }, [])
 
-  // Apply theme changes
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-    localStorage.setItem('theme', theme)
-  }, [theme])
-
   const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light')
+    const isDark = document.documentElement.classList.contains('dark')
+    if (isDark) {
+      document.documentElement.classList.remove('dark')
+      setTheme('light')
+    } else {
+      document.documentElement.classList.add('dark')
+      setTheme('dark')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,10 +87,10 @@ export default function RegisterPage() {
           className="p-2 rounded-lg bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
           aria-label="Toggle theme"
         >
-          {theme === 'light' ? (
-            <Moon className="w-5 h-5" />
-          ) : (
+          {theme === 'dark' ? (
             <Sun className="w-5 h-5" />
+          ) : (
+            <Moon className="w-5 h-5" />
           )}
         </button>
       </div>

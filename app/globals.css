@@ -72,3 +72,13 @@ body {
   scrollbar-color: rgba(75, 85, 99, 0.6) rgba(31, 41, 55, 0.5);
 }
 
+/* Fix autofill styling for dark mode inputs only */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px rgb(31 41 55) inset !important;
+  -webkit-text-fill-color: rgb(243 244 246) !important;
+  caret-color: rgb(243 244 246) !important;
+}
+

@@ -33,6 +33,26 @@ export interface TaskFile {
   uploaded_at: string
 }
 
+export interface SubTask {
+  id: string
+  taskId: string
+  title: string
+  completed: boolean
+  order: number
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface Tag {
+  id: string
+  workspaceId: string
+  name: string
+  color: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Task {
   id: string
   userId: string
@@ -48,5 +68,7 @@ export interface Task {
   updated_at: string
   project: Project | null
   files?: TaskFile[]
+  subtasks?: SubTask[]
+  tags?: Tag[]
 }
 
