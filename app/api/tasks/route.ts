@@ -351,6 +351,57 @@ export async function POST(request: NextRequest) {
       } as any,
     })
 
+    // Create notification if responsible person is assigned
+    if (task.responsible) {
+      // Find user by name in workspace members
+      const workspaceMembers = await prisma.workspaceMember.findMany({
+        where: {
+          workspaceId: targetWorkspaceId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+
+      // Also check workspace owner
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: targetWorkspaceId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      })
+
+      // Find the user with matching name
+      const assignedUser = workspaceMembers.find(
+        (m) => m.user.name === task.responsible
+      )?.user || (workspace?.user?.name === task.responsible ? workspace.user : null)
+
+      if (assignedUser && assignedUser.id !== session.user.id) {
+        // Create notification for the assigned user
+        await prisma.notification.create({
+          data: {
+            userId: assignedUser.id,
+            type: 'TASK_ASSIGNED',
+            title: 'Ai fost atribuit la o sarcină',
+            message: `${session.user.name || session.user.email} te-a atribuit la sarcina "${task.title}"`,
+            link: task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`,
+          },
+        })
+      }
+    }
+
     // Format dates and files for API response
     const taskWithFiles = task as any
     const formattedTask = {

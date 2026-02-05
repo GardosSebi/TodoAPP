@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Check, X, Users, Mail } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import TaskList from '@/components/TaskList'
@@ -22,16 +22,63 @@ interface Invitation {
   created_at: string
 }
 
+interface Notification {
+  id: string
+  type: string
+  title: string
+  message: string
+  link: string | null
+  read: boolean
+  created_at: string
+}
+
 interface InboxClientProps {
   initialTasks: any[]
   initialInvitations: Invitation[]
+  initialNotifications: Notification[]
 }
 
-export default function InboxClient({ initialTasks, initialInvitations }: InboxClientProps) {
+export default function InboxClient({ initialTasks, initialInvitations, initialNotifications }: InboxClientProps) {
   const [invitations, setInvitations] = useState<Invitation[]>(initialInvitations)
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [processing, setProcessing] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const router = useRouter()
+
+  // Fetch notifications periodically and on visibility change
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/notifications?limit=50')
+        if (res.ok) {
+          const data = await res.json()
+          setNotifications(data.notifications || [])
+        }
+      } catch (error) {
+        // Error fetching notifications
+      }
+    }
+
+    // Fetch on mount
+    fetchNotifications()
+
+    // Refetch when page becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearInterval(interval)
+    }
+  }, [])
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     // TaskList handles its own updates
@@ -116,12 +163,96 @@ export default function InboxClient({ initialTasks, initialInvitations }: InboxC
     }
   }
 
+  const handleMarkNotificationRead = async (notificationId: string) => {
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notificationIds: [notificationId],
+          read: true,
+        }),
+      })
+
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((notif) => (notif.id === notificationId ? { ...notif, read: true } : notif))
+        )
+      }
+    } catch (error) {
+      // Error marking notification as read
+    }
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    // Mark as read
+    if (!notification.read) {
+      handleMarkNotificationRead(notification.id)
+    }
+
+    // Navigate to link if available
+    if (notification.link) {
+      router.push(notification.link)
+    }
+  }
+
+  const unreadCount = notifications.filter((n) => !n.read).length
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
-      {invitations.length > 0 && (
+      {notifications.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
             <Mail className="w-5 h-5" />
+            Notificări
+            {unreadCount > 0 && (
+              <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </h2>
+          <div className="space-y-3">
+            {notifications.map((notification) => (
+              <div
+                key={notification.id}
+                onClick={() => handleNotificationClick(notification)}
+                className={`bg-white dark:bg-gray-800 border rounded-lg p-4 shadow-sm cursor-pointer transition-all hover:shadow-md ${
+                  notification.read
+                    ? 'border-gray-200 dark:border-gray-700 opacity-75'
+                    : 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {!notification.read && (
+                        <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
+                      )}
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                        {notification.title}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{notification.message}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      {new Date(notification.created_at).toLocaleString('ro-RO', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {invitations.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5" />
             Invitații Workspace
           </h2>
           <div className="space-y-3">

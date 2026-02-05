@@ -62,6 +62,16 @@ export default async function InboxPage() {
     },
   })
 
+  const notifications = await prisma.notification.findMany({
+    where: {
+      userId: session.user.id,
+    },
+    orderBy: {
+      created_at: 'desc',
+    },
+    take: 50,
+  })
+
   return (
     <InboxClient
       initialTasks={tasks.map((task: any) => ({
@@ -81,6 +91,15 @@ export default async function InboxPage() {
         inviter: inv.inviter,
         status: inv.status,
         created_at: inv.created_at.toISOString(),
+      }))}
+      initialNotifications={notifications.map((notif) => ({
+        id: notif.id,
+        type: notif.type,
+        title: notif.title,
+        message: notif.message,
+        link: notif.link,
+        read: notif.read,
+        created_at: notif.created_at.toISOString(),
       }))}
     />
   )
