@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { sendEmail, createProjectMemberEmail } from '@/lib/email'
 
 const addMemberSchema = z.object({
   userId: z.string().uuid(),
@@ -131,6 +132,12 @@ export async function POST(
       )
     }
 
+    // Get project name for email
+    const projectWithName = await prisma.project.findUnique({
+      where: { id },
+      select: { name: true },
+    })
+
     const member = await prisma.projectMember.create({
       data: {
         projectId: id,
@@ -141,10 +148,45 @@ export async function POST(
           select: {
             id: true,
             email: true,
+            name: true,
           },
         },
       },
     })
+
+    // Get inviter info
+    const inviter = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        name: true,
+        email: true,
+      },
+    })
+
+    // Create notification
+    if (member.user.id !== session.user.id) {
+      await prisma.notification.create({
+        data: {
+          userId: member.user.id,
+          type: 'PROJECT_MEMBER_ADDED',
+          title: 'Ai fost adăugat la un proiect',
+          message: `${inviter?.name || inviter?.email || 'Cineva'} te-a adăugat la proiectul "${projectWithName?.name || 'Proiect'}"`,
+          link: `/app/project/${id}`,
+        },
+      })
+
+      // Send email notification
+      if (member.user.email) {
+        const emailNotification = createProjectMemberEmail(
+          member.user.name || member.user.email,
+          inviter?.name || inviter?.email || 'Cineva',
+          projectWithName?.name || 'Proiect',
+          `/app/project/${id}`
+        )
+        emailNotification.to = member.user.email
+        await sendEmail(emailNotification)
+      }
+    }
 
     return NextResponse.json({ member }, { status: 201 })
   } catch (error) {

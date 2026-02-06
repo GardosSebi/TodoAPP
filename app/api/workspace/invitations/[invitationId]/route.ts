@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendEmail, createWorkspaceMemberEmail } from '@/lib/email'
 
 // Accept invitation
 export async function POST(
@@ -58,6 +59,33 @@ export async function POST(
       return NextResponse.json({ success: true })
     }
 
+    // Get inviter and workspace info for email
+    const invitationWithDetails = await prisma.workspaceInvitation.findUnique({
+      where: { id: invitationId },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        inviter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    })
+
     // Use transaction to accept invitation and create membership
     await prisma.$transaction(async (tx) => {
       // Update invitation status
@@ -76,6 +104,31 @@ export async function POST(
         },
       })
     })
+
+    // Create notification and send email
+    if (invitationWithDetails && invitationWithDetails.user.id !== invitationWithDetails.inviter.id) {
+      await prisma.notification.create({
+        data: {
+          userId: invitationWithDetails.user.id,
+          type: 'WORKSPACE_MEMBER_ADDED',
+          title: 'Ai fost adăugat la un workspace',
+          message: `${invitationWithDetails.inviter.name || invitationWithDetails.inviter.email || 'Cineva'} te-a adăugat la workspace-ul "${invitationWithDetails.workspace.name}"`,
+          link: `/app`,
+        },
+      })
+
+      // Send email notification
+      if (invitationWithDetails.user.email) {
+        const emailNotification = createWorkspaceMemberEmail(
+          invitationWithDetails.user.name || invitationWithDetails.user.email,
+          invitationWithDetails.inviter.name || invitationWithDetails.inviter.email || 'Cineva',
+          invitationWithDetails.workspace.name,
+          `/app`
+        )
+        emailNotification.to = invitationWithDetails.user.email
+        await sendEmail(emailNotification)
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

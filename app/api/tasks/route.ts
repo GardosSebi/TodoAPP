@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { sendEmail, createTaskAssignedEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const taskSchema = z.object({
@@ -389,16 +390,33 @@ export async function POST(request: NextRequest) {
       )?.user || (workspace?.user?.name === task.responsible ? workspace.user : null)
 
       if (assignedUser && assignedUser.id !== session.user.id) {
+        const taskLink = task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`
+        const projectName = (task.project as any)?.name || null
+        const projectInfo = projectName ? ` din proiectul "${projectName}"` : ''
+        
         // Create notification for the assigned user
         await prisma.notification.create({
           data: {
             userId: assignedUser.id,
             type: 'TASK_ASSIGNED',
             title: 'Ai fost atribuit la o sarcină',
-            message: `${session.user.name || session.user.email} te-a atribuit la sarcina "${task.title}"`,
-            link: task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`,
+            message: `${session.user.name || session.user.email} te-a atribuit la sarcina "${task.title}"${projectInfo}`,
+            link: taskLink,
           },
         })
+
+        // Send email notification
+        if (assignedUser.email) {
+          const emailNotification = createTaskAssignedEmail(
+            assignedUser.name || assignedUser.email,
+            session.user.name || session.user.email || 'Cineva',
+            task.title,
+            taskLink,
+            projectName
+          )
+          emailNotification.to = assignedUser.email
+          await sendEmail(emailNotification)
+        }
       }
     }
 

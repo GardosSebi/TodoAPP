@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { sendEmail, createMentionEmail } from '@/lib/email'
 
 const commentSchema = z.object({
   content: z.string().trim().min(1).max(5000),
@@ -91,7 +92,7 @@ export async function POST(
     const body = await request.json()
     const data = commentSchema.parse(body)
 
-    // Verify task access
+    // Verify task access and get task with project info
     const task = await prisma.task.findFirst({
       where: { id: taskId },
       include: {
@@ -102,6 +103,12 @@ export async function POST(
             members: {
               where: { userId: session.user.id },
             },
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            name: true,
           },
         },
       },
@@ -121,26 +128,81 @@ export async function POST(
     }
 
     // Extract mentions from content (@username pattern)
-    const mentionRegex = /@(\w+)/g
+    // Improved regex to handle names with spaces and special characters
+    const mentionRegex = /@([^\s@]+)/g
     const mentions: string[] = []
     let match
     while ((match = mentionRegex.exec(data.content)) !== null) {
       mentions.push(match[1])
     }
 
+
     // Find mentioned users by name or email
-    const mentionedUsers = await prisma.user.findMany({
-      where: {
-        workspaceId: task.workspaceId,
-        OR: [
-          { name: { in: mentions, mode: 'insensitive' } },
-          { email: { in: mentions, mode: 'insensitive' } },
-        ],
+    // Need to check both workspace owner and workspace members
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: task.workspaceId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
-      select: { id: true },
     })
 
+    // Get all users in workspace (owner + members)
+    const allWorkspaceUsers: Array<{ id: string; name: string; email: string }> = []
+    
+    // Add workspace owner
+    if (workspace?.user) {
+      allWorkspaceUsers.push(workspace.user)
+    }
+    
+    // Add workspace members
+    workspace?.members.forEach((member) => {
+      if (member.user) {
+        allWorkspaceUsers.push(member.user)
+      }
+    })
+
+
+    // Find mentioned users by matching names or emails (case-insensitive)
+    const mentionedUsers: Array<{ id: string; name: string; email: string }> = []
+    
+    for (const mention of mentions) {
+      const mentionLower = mention.toLowerCase()
+      for (const user of allWorkspaceUsers) {
+        const userNameLower = user.name?.toLowerCase() || ''
+        const userEmailLower = user.email?.toLowerCase() || ''
+        
+        // Check if mention matches user name or email (exact match or contains)
+        if (
+          (userNameLower === mentionLower || userNameLower.includes(mentionLower) || mentionLower.includes(userNameLower)) ||
+          (userEmailLower === mentionLower || userEmailLower.includes(mentionLower))
+        ) {
+          // Avoid duplicates
+          if (!mentionedUsers.some(u => u.id === user.id)) {
+            mentionedUsers.push(user)
+          }
+        }
+      }
+    }
+
     const mentionedUserIds = mentionedUsers.map((u) => u.id)
+    
 
     const comment = await prisma.comment.create({
       data: {
@@ -172,19 +234,39 @@ export async function POST(
       },
     })
 
-    // Create notifications for mentioned users
+    // Create notifications and send emails for mentioned users
     if (mentionedUserIds.length > 0) {
+      const taskLink = task.projectId ? `/app/project/${task.projectId}?task=${taskId}` : `/app?task=${taskId}`
+      const projectName = task.project?.name || null
+
+      // Create notifications
       const notifications = mentionedUserIds.map((userId) => ({
         userId,
         type: 'MENTION',
-        title: 'You were mentioned in a comment',
-        message: `${session.user.name || session.user.email} mentioned you in a comment on task "${task.title}"`,
-        link: `/app/project/${task.projectId || 'inbox'}?task=${taskId}`,
+        title: 'Ai fost menționat într-un comentariu',
+        message: `${session.user.name || session.user.email} te-a menționat într-un comentariu la sarcina "${task.title}"`,
+        link: taskLink,
       }))
 
       await prisma.notification.createMany({
         data: notifications,
       })
+
+      // Send email notifications to mentioned users (excluding the commenter)
+      for (const mentionedUser of mentionedUsers) {
+        if (mentionedUser.id !== session.user.id && mentionedUser.email) {
+          const emailNotification = createMentionEmail(
+            mentionedUser.name || mentionedUser.email,
+            session.user.name || session.user.email || 'Cineva',
+            task.title,
+            data.content.trim(),
+            taskLink,
+            projectName
+          )
+          emailNotification.to = mentionedUser.email
+          await sendEmail(emailNotification)
+        }
+      }
     }
 
     return NextResponse.json(
