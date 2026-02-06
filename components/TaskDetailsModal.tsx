@@ -21,7 +21,7 @@ interface WorkspaceMember {
 interface TaskDetailsModalProps {
   task: Task
   onClose: () => void
-  onUpdate: (taskId: string, updates: Partial<Task>) => void
+  onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
   onDelete: (taskId: string) => void
 }
 
@@ -521,7 +521,7 @@ export default function TaskDetailsModal({
         due_at: dueDate ? new Date(dueDate).toISOString() : null,
         responsible: responsible || null,
       }
-      onUpdate(task.id, updates)
+      await onUpdate(task.id, updates)
       onClose()
     } catch (error) {
       // Error saving task

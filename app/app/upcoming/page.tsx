@@ -4,12 +4,20 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import UpcomingClient from './UpcomingClient'
 
-export default async function UpcomingPage() {
+interface UpcomingPageProps {
+  searchParams: Promise<{ days?: string }>
+}
+
+export default async function UpcomingPage({ searchParams }: UpcomingPageProps) {
   const session = await getServerSession(authOptions)
 
   if (!session) {
     redirect('/login')
   }
+
+  const params = await searchParams
+  const days = params.days ? parseInt(params.days, 10) : 7
+  const validDays = isNaN(days) || days < 1 ? 7 : days
 
   // Get workspaces where user is owner or member
   const userWorkspaces = await prisma.workspace.findMany({
@@ -44,12 +52,12 @@ export default async function UpcomingPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   
-  // Calculate 7 days from today (end of day)
-  const sevenDaysFromNow = new Date(today)
-  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
-  sevenDaysFromNow.setHours(23, 59, 59, 999)
+  // Calculate days from today (end of day)
+  const daysFromNow = new Date(today)
+  daysFromNow.setDate(daysFromNow.getDate() + validDays)
+  daysFromNow.setHours(23, 59, 59, 999)
 
-  // Get tasks from all accessible workspaces that are not completed/finished and have due date within the next 7 days
+  // Get tasks from all accessible workspaces that are not completed/finished and have due date within the next N days
   const tasks = workspaceIds.length > 0 ? await prisma.task.findMany({
     where: {
       workspaceId: { in: workspaceIds },
@@ -58,7 +66,7 @@ export default async function UpcomingPage() {
       },
       due_at: {
         gte: today,
-        lte: sevenDaysFromNow,
+        lte: daysFromNow,
       },
     },
     include: {
@@ -90,11 +98,12 @@ export default async function UpcomingPage() {
       <div className="mb-4 md:mb-6">
         <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">Viitoare</h1>
         <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">
-          Sarcini în următoarele 7 zile ({tasks.length})
+          Sarcini în următoarele {validDays} {validDays === 1 ? 'zi' : 'zile'} ({tasks.length})
         </p>
       </div>
 
       <UpcomingClient
+        days={validDays}
         projects={projects.map((project: any) => ({
           ...project,
           created_at: project.created_at.toISOString(),

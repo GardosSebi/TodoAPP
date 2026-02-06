@@ -9,7 +9,7 @@ import TaskDetailsModal from './TaskDetailsModal'
 
 interface TaskItemProps {
   task: Task
-  onUpdate: (taskId: string, updates: Partial<Task>) => void
+  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
   onDelete: (taskId: string) => void
   onClick?: (task: Task) => void
 }

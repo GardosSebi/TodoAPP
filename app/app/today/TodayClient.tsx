@@ -83,13 +83,12 @@ export default function TodayClient({ initialTasks, monthTasks }: TodayClientPro
           prev.map((task) => (task.id === taskId ? updatedTask : task))
         )
 
-        // Update selected task if it's the one being edited
-        if (selectedTask?.id === taskId) {
-          setSelectedTask(updatedTask)
-        }
+        // Don't update selectedTask here - let the modal close first
+        // The modal will close via onClose() callback
       }
     } catch (error) {
       // Error('Error updating task:', error)
+      throw error // Re-throw to let modal handle the error
     }
   }
 

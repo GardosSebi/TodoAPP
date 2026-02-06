@@ -66,6 +66,16 @@ export async function GET(request: NextRequest) {
           },
         })
 
+        const activeTasks = await prisma.task.count({
+          where: {
+            projectId: project.id,
+            workspaceId: { in: workspaceIds },
+            status: {
+              in: ['NOT_STARTED', 'IN_PROGRESS'],
+            },
+          },
+        })
+
         const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
         return {
@@ -74,7 +84,7 @@ export async function GET(request: NextRequest) {
           projectColor: project.color,
           totalTasks,
           completedTasks,
-          activeTasks: totalTasks - completedTasks,
+          activeTasks,
           progress,
         }
       })
@@ -190,7 +200,9 @@ export async function GET(request: NextRequest) {
     const activeTasks = await prisma.task.count({
       where: {
         workspaceId: { in: workspaceIds },
-        status: 'ACTIVE',
+        status: {
+          in: ['NOT_STARTED', 'IN_PROGRESS'],
+        },
       },
     })
 

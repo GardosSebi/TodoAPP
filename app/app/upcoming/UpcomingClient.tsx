@@ -1,17 +1,32 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, ChevronRight, Folder } from 'lucide-react'
 import TaskItem from '@/components/TaskItem'
 import { Task, Project } from '@/types'
 
 interface UpcomingClientProps {
+  days: number
   projects: Project[]
   tasks: Task[]
 }
 
-export default function UpcomingClient({ projects, tasks }: UpcomingClientProps) {
+export default function UpcomingClient({ days, projects, tasks }: UpcomingClientProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const handleDaysChange = (newDays: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (newDays === 7) {
+      params.delete('days')
+    } else {
+      params.set('days', newDays.toString())
+    }
+    router.push(`/app/upcoming?${params.toString()}`)
+  }
+
   // Group tasks by project and compute projects with tasks
   const { tasksByProject, tasksWithoutProject, projectsWithTasks } = useMemo(() => {
     const tasksByProject = new Map<string, Task[]>()
@@ -84,6 +99,25 @@ export default function UpcomingClient({ projects, tasks }: UpcomingClientProps)
 
   return (
     <div className="space-y-6">
+      {/* Days selector */}
+      <div className="flex items-center gap-3 mb-4">
+        <label htmlFor="days-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Perioadă:
+        </label>
+        <select
+          id="days-select"
+          value={days}
+          onChange={(e) => handleDaysChange(parseInt(e.target.value, 10))}
+          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value={7}>7 zile</option>
+          <option value={14}>14 zile</option>
+          <option value={30}>30 zile</option>
+          <option value={60}>60 zile</option>
+          <option value={90}>90 zile</option>
+        </select>
+      </div>
+
       {/* Projects with tasks */}
       {projectsWithTasks.map((project) => {
         const projectTasks = tasksByProject.get(project.id) || []
