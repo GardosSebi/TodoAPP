@@ -5,8 +5,10 @@ import QuickAddTask from '@/components/QuickAddTask'
 import TaskDetailsModal from '@/components/TaskDetailsModal'
 import SearchBar from '@/components/SearchBar'
 import AdvancedFilters from '@/components/AdvancedFilters'
+import ImportTasksModal from '@/components/ImportTasksModal'
 import { Task, Tag } from '@/types'
 import { useState, useEffect } from 'react'
+import { Upload } from 'lucide-react'
 
 interface ProjectClientProps {
   initialTasks: Task[]
@@ -22,6 +24,7 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   const [projects, setProjects] = useState<any[]>([])
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([])
   const [tags, setTags] = useState<Tag[]>([])
+  const [showImportModal, setShowImportModal] = useState(false)
 
   useEffect(() => {
     fetchProjects()
@@ -206,6 +209,53 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
     }
   }
 
+  const handleImportTasks = async (importTasks: Array<{
+    titlu: string
+    termen: string
+    prioritate: string | number
+    descriere: string
+  }>) => {
+    try {
+      const res = await fetch('/api/tasks/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          tasks: importTasks.map((task) => ({
+            title: task.titlu,
+            notes: task.descriere || null,
+            due_at: task.termen || null,
+            priority: typeof task.prioritate === 'number' ? task.prioritate : parseInt(String(task.prioritate)) || 0,
+          })),
+        }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to import tasks')
+      }
+
+      const data = await res.json()
+      
+      // Add imported tasks to state
+      const newTasks = data.tasks.map((task: any) => ({
+        ...task,
+        status: 'NOT_STARTED' as const,
+        due_at: task.due_at || null,
+        completed_at: task.completed_at || null,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+      }))
+      
+      setTasks((prev) => [...newTasks, ...prev])
+      
+      // Refresh page to get full task data
+      window.location.reload()
+    } catch (error: any) {
+      throw error
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6">
@@ -223,8 +273,18 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
         </p>
       </div>
 
-      <div className="mb-4">
-        <QuickAddTask onAdd={handleAddTask} projectId={projectId} placeholder="Adaugă o sarcină la acest proiect..." />
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex-1">
+          <QuickAddTask onAdd={handleAddTask} projectId={projectId} placeholder="Adaugă o sarcină la acest proiect..." />
+        </div>
+        <button
+          onClick={() => setShowImportModal(true)}
+          className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <Upload className="w-4 h-4 flex-shrink-0" />
+          <span className="hidden sm:inline">Import Sarcini</span>
+          <span className="sm:hidden">Import</span>
+        </button>
       </div>
 
       {/* Search and Filters */}
@@ -258,6 +318,13 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
           onDelete={handleTaskDelete}
         />
       )}
+
+      <ImportTasksModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImportTasks}
+        projectId={projectId}
+      />
     </div>
   )
 }
