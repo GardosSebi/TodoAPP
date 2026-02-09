@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, X, Users, Mail, AtSign, UserCheck } from 'lucide-react'
+import { Check, X, Users, Mail, AtSign, UserCheck, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import TaskList from '@/components/TaskList'
 import TaskDetailsModal from '@/components/TaskDetailsModal'
@@ -45,7 +45,7 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const [notifications, setNotifications] = useState<Notification[]>(sortedInitialNotifications)
-  const [notificationFilter, setNotificationFilter] = useState<string | null>(null) // null = all, 'MENTION' = mentions, 'TASK_ASSIGNED' = assignments
+  const [notificationFilters, setNotificationFilters] = useState<string[]>([]) // Array of selected filter types, empty = all
   const [processing, setProcessing] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const router = useRouter()
@@ -230,9 +230,9 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
         const yesterdayStr = yesterday.toDateString()
         
         if (dateStr === todayStr) {
-          dateKey = 'Today'
+          dateKey = 'ASTĂZI'
         } else if (dateStr === yesterdayStr) {
-          dateKey = 'Yesterday'
+          dateKey = 'IERI'
         } else {
           dateKey = date.toLocaleDateString('ro-RO', {
             weekday: 'long',
@@ -259,9 +259,9 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
     })
   }
 
-  // Filter notifications based on selected filter
-  const filteredNotifications = notificationFilter
-    ? notifications.filter((n) => n.type === notificationFilter)
+  // Filter notifications based on selected filters
+  const filteredNotifications = notificationFilters.length > 0
+    ? notifications.filter((n) => notificationFilters.includes(n.type))
     : notifications
 
   const groupedNotifications = groupNotificationsByDate(filteredNotifications)
@@ -270,6 +270,9 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
   // Count notifications by type
   const mentionCount = notifications.filter((n) => n.type === 'MENTION').length
   const assignmentCount = notifications.filter((n) => n.type === 'TASK_ASSIGNED').length
+  const completedCount = notifications.filter((n) => n.type === 'TASK_COMPLETED').length
+  const dueSoonCount = notifications.filter((n) => n.type === 'TASK_DUE_SOON').length
+  const overdueCount = notifications.filter((n) => n.type === 'TASK_OVERDUE').length
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
@@ -290,9 +293,9 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
           {/* Filter Buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
-              onClick={() => setNotificationFilter(null)}
+              onClick={() => setNotificationFilters([])}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                notificationFilter === null
+                notificationFilters.length === 0
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
@@ -303,9 +306,16 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
               </span>
             </button>
             <button
-              onClick={() => setNotificationFilter('MENTION')}
+              onClick={() => {
+                const filterType = 'MENTION'
+                setNotificationFilters((prev) =>
+                  prev.includes(filterType)
+                    ? prev.filter((f) => f !== filterType)
+                    : [...prev, filterType]
+                )
+              }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                notificationFilter === 'MENTION'
+                notificationFilters.includes('MENTION')
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
@@ -314,7 +324,7 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
               Mențiuni
               {mentionCount > 0 && (
                 <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
-                  notificationFilter === 'MENTION'
+                  notificationFilters.includes('MENTION')
                     ? 'bg-white/20'
                     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 }`}>
@@ -323,9 +333,16 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
               )}
             </button>
             <button
-              onClick={() => setNotificationFilter('TASK_ASSIGNED')}
+              onClick={() => {
+                const filterType = 'TASK_ASSIGNED'
+                setNotificationFilters((prev) =>
+                  prev.includes(filterType)
+                    ? prev.filter((f) => f !== filterType)
+                    : [...prev, filterType]
+                )
+              }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                notificationFilter === 'TASK_ASSIGNED'
+                notificationFilters.includes('TASK_ASSIGNED')
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
@@ -334,11 +351,92 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
               Atribuiri
               {assignmentCount > 0 && (
                 <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
-                  notificationFilter === 'TASK_ASSIGNED'
+                  notificationFilters.includes('TASK_ASSIGNED')
                     ? 'bg-white/20'
                     : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                 }`}>
                   {assignmentCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                const filterType = 'TASK_COMPLETED'
+                setNotificationFilters((prev) =>
+                  prev.includes(filterType)
+                    ? prev.filter((f) => f !== filterType)
+                    : [...prev, filterType]
+                )
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilters.includes('TASK_COMPLETED')
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <CheckCircle className="w-4 h-4" />
+              Task Finalizate
+              {completedCount > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
+                  notificationFilters.includes('TASK_COMPLETED')
+                    ? 'bg-white/20'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                }`}>
+                  {completedCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                const filterType = 'TASK_DUE_SOON'
+                setNotificationFilters((prev) =>
+                  prev.includes(filterType)
+                    ? prev.filter((f) => f !== filterType)
+                    : [...prev, filterType]
+                )
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilters.includes('TASK_DUE_SOON')
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Termen Apropiat
+              {dueSoonCount > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
+                  notificationFilters.includes('TASK_DUE_SOON')
+                    ? 'bg-white/20'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                }`}>
+                  {dueSoonCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                const filterType = 'TASK_OVERDUE'
+                setNotificationFilters((prev) =>
+                  prev.includes(filterType)
+                    ? prev.filter((f) => f !== filterType)
+                    : [...prev, filterType]
+                )
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilters.includes('TASK_OVERDUE')
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Termen Depășit
+              {overdueCount > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
+                  notificationFilters.includes('TASK_OVERDUE')
+                    ? 'bg-white/20'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                }`}>
+                  {overdueCount}
                 </span>
               )}
             </button>

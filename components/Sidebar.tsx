@@ -18,6 +18,7 @@ import {
   X,
   Menu,
   BarChart3,
+  Settings,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import TeamManagement from './TeamManagement'
@@ -413,6 +414,17 @@ export default function Sidebar() {
               <SunIcon className="w-5 h-5" />
             )}
           </button>
+          <Link
+            href="/app/settings"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex-1 flex items-center justify-center gap-3 px-3 py-2 rounded-lg transition-colors font-medium ${
+              pathname === '/app/settings'
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            <Settings className="w-5 h-5" />
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
             className="flex-1 flex items-center justify-center gap-3 px-3 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 dark:text-gray-300 dark:hover:bg-red-900/50 dark:hover:text-red-400 rounded-lg transition-colors font-medium"

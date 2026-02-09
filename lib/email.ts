@@ -313,3 +313,110 @@ export function createTaskCompletedEmail(
   }
 }
 
+export function createTaskDueSoonEmail(
+  recipientName: string,
+  taskTitle: string,
+  taskLink: string,
+  daysRemaining: number,
+  dueDate: string,
+  projectName?: string | null
+): EmailNotification {
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const fullLink = `${appUrl}${taskLink}`
+  const projectInfo = projectName ? ` din proiectul <strong>"${projectName}"</strong>` : ''
+  const daysText = daysRemaining === 1 ? 'zi' : 'zile'
+
+  return {
+    to: '', // Will be set by caller
+    subject: `Termen limită: ${taskTitle} (${daysRemaining} ${daysText} rămase)`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #f59e0b; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #f59e0b; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #f59e0b; }
+            .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
+            .warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px; margin: 16px 0; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⏰ Termen limită apropiindu-se</h1>
+            </div>
+            <div class="content">
+              <p>Salut ${recipientName},</p>
+              <div class="warning">
+                <p style="margin: 0; font-weight: bold; color: #92400e;">Mai ai <strong>${daysRemaining} ${daysText}</strong> până la termen!</p>
+              </div>
+              <p>Sarcina${projectInfo} <strong>"${taskTitle}"</strong> are termen limită pe <strong>${dueDate}</strong>.</p>
+              ${projectName ? `<p style="color: #6b7280; font-size: 14px;">Proiect: <strong>${projectName}</strong></p>` : ''}
+              <a href="${fullLink}" class="button">Vezi Sarcina</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Salut ${recipientName},\n\nMai ai ${daysRemaining} ${daysText} până la termen!\n\nSarcina${projectName ? ` din proiectul "${projectName}"` : ''} "${taskTitle}" are termen limită pe ${dueDate}.\n\nVezi Sarcina: ${fullLink}`,
+  }
+}
+
+export function createTaskOverdueEmail(
+  recipientName: string,
+  taskTitle: string,
+  taskLink: string,
+  daysOverdue: number,
+  dueDate: string,
+  projectName?: string | null
+): EmailNotification {
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const fullLink = `${appUrl}${taskLink}`
+  const projectInfo = projectName ? ` din proiectul <strong>"${projectName}"</strong>` : ''
+  const daysText = daysOverdue === 1 ? 'zi' : 'zile'
+
+  return {
+    to: '', // Will be set by caller
+    subject: `⚠️ Termen depășit: ${taskTitle} (${daysOverdue} ${daysText})`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #ef4444; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #ef4444; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #ef4444; }
+            .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
+            .error { background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 12px; margin: 16px 0; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>⚠️ Termen depășit</h1>
+            </div>
+            <div class="content">
+              <p>Salut ${recipientName},</p>
+              <div class="error">
+                <p style="margin: 0; font-weight: bold; color: #991b1b;">Termenul limită a fost depășit cu <strong>${daysOverdue} ${daysText}</strong>!</p>
+              </div>
+              <p>Sarcina${projectInfo} <strong>"${taskTitle}"</strong> avea termen limită pe <strong>${dueDate}</strong> și este acum depășită.</p>
+              ${projectName ? `<p style="color: #6b7280; font-size: 14px;">Proiect: <strong>${projectName}</strong></p>` : ''}
+              <p style="color: #991b1b; font-weight: bold;">Te rugăm să finalizezi această sarcină cât mai curând posibil.</p>
+              <a href="${fullLink}" class="button">Vezi Sarcina</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Salut ${recipientName},\n\n⚠️ TERMEN DEPĂȘIT!\n\nTermenul limită a fost depășit cu ${daysOverdue} ${daysText}!\n\nSarcina${projectName ? ` din proiectul "${projectName}"` : ''} "${taskTitle}" avea termen limită pe ${dueDate}.\n\nTe rugăm să finalizezi această sarcină cât mai curând posibil.\n\nVezi Sarcina: ${fullLink}`,
+  }
+}
+

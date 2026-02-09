@@ -250,12 +250,12 @@ export default function AdvancedFilters({
             </div>
 
             {/* Tags Filter */}
-            {tags.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
-                  <TagIcon className="w-4 h-4" />
-                  Etichete
-                </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                <TagIcon className="w-4 h-4" />
+                Etichete
+              </label>
+              {tags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => {
                     const isSelected = filters.tagIds?.includes(tag.id)
@@ -289,8 +289,12 @@ export default function AdvancedFilters({
                     )
                   })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  Nu există etichete disponibile
+                </p>
+              )}
+            </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">

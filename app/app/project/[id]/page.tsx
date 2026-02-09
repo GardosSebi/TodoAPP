@@ -69,6 +69,11 @@ export default async function ProjectPage({
           uploaded_at: 'desc',
         },
       },
+      tags: {
+        include: {
+          tag: true,
+        },
+      },
     } as any,
     orderBy: [
       { priority: 'desc' },
@@ -94,6 +99,13 @@ export default async function ProjectPage({
         files: (task.files || []).map((file: any) => ({
           ...file,
           uploaded_at: file.uploaded_at.toISOString(),
+        })),
+        tags: (task.tags || []).map((taskTag: any) => ({
+          id: taskTag.tag.id,
+          name: taskTag.tag.name,
+          color: taskTag.tag.color,
+          created_at: taskTag.tag.created_at.toISOString(),
+          updated_at: taskTag.tag.updated_at.toISOString(),
         })),
       }))}
       projectId={id}
