@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { sendEmail, createTaskAssignedEmail } from '@/lib/email'
+import { sendEmail, createTaskAssignedEmail, createTaskCompletedEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const updateTaskSchema = z.object({
@@ -266,6 +266,87 @@ export async function PATCH(
         },
       },
     })
+
+    // Create notifications and send emails when task is completed
+    if (data.status !== undefined && task.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
+      // Get workspace with all members
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: existingTask.workspaceId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      })
+
+      // Get all workspace users (owner + members)
+      const allWorkspaceUsers: Array<{ id: string; name: string; email: string }> = []
+      
+      // Add workspace owner
+      if (workspace?.user) {
+        allWorkspaceUsers.push(workspace.user)
+      }
+      
+      // Add workspace members
+      workspace?.members.forEach((member) => {
+        if (member.user) {
+          allWorkspaceUsers.push(member.user)
+        }
+      })
+
+      // Filter out the user who completed the task
+      const recipients = allWorkspaceUsers.filter((user) => user.id !== session.user.id)
+
+      if (recipients.length > 0) {
+        const taskLink = task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`
+        const projectName = (task.project as any)?.name || null
+        const completerName = session.user.name || session.user.email || 'Cineva'
+        const projectInfo = projectName ? ` din proiectul "${projectName}"` : ''
+
+        // Create notifications for all recipients
+        const notifications = recipients.map((user) => ({
+          userId: user.id,
+          type: 'TASK_COMPLETED',
+          title: 'Sarcina finalizată',
+          message: `${completerName} a finalizat sarcina "${task.title}"${projectInfo}`,
+          link: taskLink,
+        }))
+
+        await prisma.notification.createMany({
+          data: notifications,
+        })
+
+        // Send email notifications
+        for (const recipient of recipients) {
+          if (recipient.email) {
+            const emailNotification = createTaskCompletedEmail(
+              recipient.name || recipient.email,
+              completerName,
+              task.title,
+              taskLink,
+              projectName
+            )
+            emailNotification.to = recipient.email
+            await sendEmail(emailNotification)
+          }
+        }
+      }
+    }
 
     // Create notification if responsible person was assigned or changed
     if (data.responsible !== undefined && task.responsible && task.responsible !== existingTask.responsible) {

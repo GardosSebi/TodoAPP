@@ -94,7 +94,7 @@ export function createTaskAssignedEmail(
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
             .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #3b82f6; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #3b82f6; }
             .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
           </style>
         </head>
@@ -139,7 +139,7 @@ export function createProjectMemberEmail(
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
             .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #10b981; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #10b981; }
             .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
           </style>
         </head>
@@ -184,7 +184,7 @@ export function createWorkspaceMemberEmail(
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #8b5cf6; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
             .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #8b5cf6; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #8b5cf6; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #8b5cf6; }
             .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
           </style>
         </head>
@@ -238,7 +238,7 @@ export function createMentionEmail(
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
             .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
-            .button { display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #3b82f6; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #3b82f6; }
             .comment-preview { background-color: #ffffff; border-left: 3px solid #3b82f6; padding: 12px; margin: 15px 0; border-radius: 4px; font-style: italic; }
           </style>
         </head>
@@ -262,6 +262,54 @@ export function createMentionEmail(
       </html>
     `,
     text: `Salut ${recipientName},\n\n${commenterName} te-a menționat într-un comentariu la sarcina${projectName ? ` din proiectul "${projectName}"` : ''}:\n"${taskTitle}"\n\nComentariu: "${truncatedPreview}"\n\nVezi Comentariul: ${fullLink}`,
+  }
+}
+
+export function createTaskCompletedEmail(
+  recipientName: string,
+  completerName: string,
+  taskTitle: string,
+  taskLink: string,
+  projectName?: string | null
+): EmailNotification {
+  const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+  const fullLink = `${appUrl}${taskLink}`
+  const projectInfo = projectName ? ` din proiectul <strong>"${projectName}"</strong>` : ''
+
+  return {
+    to: '', // Will be set by caller
+    subject: `Sarcina finalizată: ${taskTitle}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #3b82f6; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+            .content { background-color: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; }
+            .button { display: inline-block; padding: 12px 24px; background-color: white; color: #3b82f6; text-decoration: none; border-radius: 6px; margin-top: 20px; border: 2px solid #3b82f6; }
+            .footer { margin-top: 20px; font-size: 12px; color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✓ Sarcina finalizată</h1>
+            </div>
+            <div class="content">
+              <p>Salut ${recipientName},</p>
+              <p><strong>${completerName}</strong> a finalizat sarcina${projectInfo}:</p>
+              <p style="font-size: 18px; font-weight: bold; color: #1f2937;">"${taskTitle}"</p>
+              ${projectName ? `<p style="color: #6b7280; font-size: 14px;">Proiect: <strong>${projectName}</strong></p>` : ''}
+              <a href="${fullLink}" class="button">Vezi Sarcina</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Salut ${recipientName},\n\n${completerName} a finalizat sarcina${projectName ? ` din proiectul "${projectName}"` : ''}:\n"${taskTitle}"\n\nVezi Sarcina: ${fullLink}`,
   }
 }
 

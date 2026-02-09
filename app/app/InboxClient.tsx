@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, X, Users, Mail } from 'lucide-react'
+import { Check, X, Users, Mail, AtSign, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import TaskList from '@/components/TaskList'
 import TaskDetailsModal from '@/components/TaskDetailsModal'
@@ -40,7 +40,12 @@ interface InboxClientProps {
 
 export default function InboxClient({ initialTasks, initialInvitations, initialNotifications }: InboxClientProps) {
   const [invitations, setInvitations] = useState<Invitation[]>(initialInvitations)
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
+  // Sort initial notifications by date (most recent first)
+  const sortedInitialNotifications = [...initialNotifications].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+  const [notifications, setNotifications] = useState<Notification[]>(sortedInitialNotifications)
+  const [notificationFilter, setNotificationFilter] = useState<string | null>(null) // null = all, 'MENTION' = mentions, 'TASK_ASSIGNED' = assignments
   const [processing, setProcessing] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const router = useRouter()
@@ -52,7 +57,12 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
         const res = await fetch('/api/notifications?limit=50')
         if (res.ok) {
           const data = await res.json()
-          setNotifications(data.notifications || [])
+          // Sort notifications by date (most recent first)
+          const sorted = (data.notifications || []).sort(
+            (a: Notification, b: Notification) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+          setNotifications(sorted)
         }
       } catch (error) {
         // Error fetching notifications
@@ -175,9 +185,15 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
       })
 
       if (res.ok) {
-        setNotifications((prev) =>
-          prev.map((notif) => (notif.id === notificationId ? { ...notif, read: true } : notif))
-        )
+        setNotifications((prev) => {
+          const updated = prev.map((notif) => (notif.id === notificationId ? { ...notif, read: true } : notif))
+          // Maintain sort order by date
+          return updated.sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        })
+        // Emit custom event to update sidebar notification count
+        window.dispatchEvent(new CustomEvent('notificationRead'))
       }
     } catch (error) {
       // Error marking notification as read
@@ -196,56 +212,191 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
     }
   }
 
+  // Group notifications by date
+  const groupNotificationsByDate = (notifications: Notification[]) => {
+    const grouped: { [key: string]: Notification[] } = {}
+    
+    notifications
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .forEach((notification) => {
+        const date = new Date(notification.created_at)
+        const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        
+        let dateKey: string
+        const dateStr = date.toDateString()
+        const todayStr = today.toDateString()
+        const yesterdayStr = yesterday.toDateString()
+        
+        if (dateStr === todayStr) {
+          dateKey = 'Today'
+        } else if (dateStr === yesterdayStr) {
+          dateKey = 'Yesterday'
+        } else {
+          dateKey = date.toLocaleDateString('ro-RO', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        }
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = []
+        }
+        grouped[dateKey].push(notification)
+      })
+    
+    return grouped
+  }
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('ro-RO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  // Filter notifications based on selected filter
+  const filteredNotifications = notificationFilter
+    ? notifications.filter((n) => n.type === notificationFilter)
+    : notifications
+
+  const groupedNotifications = groupNotificationsByDate(filteredNotifications)
   const unreadCount = notifications.filter((n) => !n.read).length
+  
+  // Count notifications by type
+  const mentionCount = notifications.filter((n) => n.type === 'MENTION').length
+  const assignmentCount = notifications.filter((n) => n.type === 'TASK_ASSIGNED').length
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       {notifications.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-            <Mail className="w-5 h-5" />
-            Notificări
-            {unreadCount > 0 && (
-              <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full">
-                {unreadCount}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Notificări
+              {unreadCount > 0 && (
+                <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </h2>
+          </div>
+          
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              onClick={() => setNotificationFilter(null)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilter === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Toate
+              <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 dark:bg-gray-700 rounded">
+                {notifications.length}
               </span>
-            )}
-          </h2>
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <div
-                key={notification.id}
-                onClick={() => handleNotificationClick(notification)}
-                className={`bg-white dark:bg-gray-800 border rounded-lg p-4 shadow-sm cursor-pointer transition-all hover:shadow-md ${
-                  notification.read
-                    ? 'border-gray-200 dark:border-gray-700 opacity-75'
-                    : 'border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      {!notification.read && (
-                        <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
-                      )}
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                        {notification.title}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{notification.message}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      {new Date(notification.created_at).toLocaleString('ro-RO', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+            </button>
+            <button
+              onClick={() => setNotificationFilter('MENTION')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilter === 'MENTION'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <AtSign className="w-4 h-4" />
+              Mențiuni
+              {mentionCount > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
+                  notificationFilter === 'MENTION'
+                    ? 'bg-white/20'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                }`}>
+                  {mentionCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setNotificationFilter('TASK_ASSIGNED')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                notificationFilter === 'TASK_ASSIGNED'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              Atribuiri
+              {assignmentCount > 0 && (
+                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded ${
+                  notificationFilter === 'TASK_ASSIGNED'
+                    ? 'bg-white/20'
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                }`}>
+                  {assignmentCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {filteredNotifications.length > 0 ? (
+            <div className="space-y-8">
+              {Object.entries(groupedNotifications).map(([dateKey, dayNotifications]) => (
+                <div key={dateKey}>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
+                    {dateKey}
+                  </h3>
+                  <div className="space-y-1">
+                    {dayNotifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`group flex items-start gap-4 p-3 rounded-lg cursor-pointer transition-all ${
+                          notification.read
+                            ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                            : 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                        }`}
+                      >
+                        <div className="flex-shrink-0 w-16 text-right">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            {formatTime(notification.created_at)}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            {!notification.read && (
+                              <div className="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0 mt-1.5"></div>
+                            )}
+                            <div className="flex-1">
+                              <h4 className={`text-sm font-medium ${
+                                notification.read
+                                  ? 'text-gray-700 dark:text-gray-300'
+                                  : 'text-gray-900 dark:text-gray-100'
+                              }`}>
+                                {notification.title}
+                              </h4>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                {notification.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>Nu există notificări pentru filtrul selectat.</p>
+            </div>
+          )}
         </div>
       )}
 

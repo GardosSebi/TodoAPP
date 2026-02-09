@@ -59,6 +59,7 @@ export default function DashboardClient() {
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   const [isDark, setIsDark] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
 
   useEffect(() => {
     fetchStats()
@@ -201,7 +202,16 @@ export default function DashboardClient() {
           </h2>
           {projectProgress.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={projectProgress}>
+              <BarChart 
+                data={projectProgress}
+                onMouseLeave={() => setSelectedProject(null)}
+                onMouseMove={(state: any) => {
+                  if (state && state.activePayload && state.activePayload[0]) {
+                    const projectId = state.activePayload[0].payload.projectId
+                    setSelectedProject(projectId)
+                  }
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis
                   dataKey="projectName"
@@ -219,12 +229,57 @@ export default function DashboardClient() {
                     color: tooltipText,
                     boxShadow: isDark ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                   }}
-                  labelStyle={{ color: tooltipText }}
+                  labelStyle={{ color: tooltipText, fontWeight: 'bold' }}
                   itemStyle={{ color: tooltipText }}
+                  cursor={{ 
+                    fill: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(229, 231, 235, 0.5)',
+                    stroke: isDark ? '#334155' : '#9ca3af',
+                    strokeWidth: 1,
+                  }}
                 />
-                <Legend wrapperStyle={{ color: textColor }} />
-                <Bar dataKey="completedTasks" fill="#10b981" name="Finalizate" />
-                <Bar dataKey="activeTasks" fill="#f59e0b" name="Active" />
+                <Legend wrapperStyle={{ color: textColor }} iconType="rect" />
+                <Bar 
+                  dataKey="completedTasks" 
+                  name="Finalizate"
+                  fill="#10b981"
+                  onMouseEnter={(data: any) => {
+                    if (data && data.projectId) {
+                      setSelectedProject(data.projectId)
+                    }
+                  }}
+                >
+                  {projectProgress.map((entry, index) => (
+                    <Cell
+                      key={`cell-completed-${index}`}
+                      fill={selectedProject === entry.projectId ? '#059669' : '#10b981'}
+                      style={{
+                        opacity: selectedProject && selectedProject !== entry.projectId ? 0.5 : 1,
+                        transition: 'all 0.2s ease',
+                      }}
+                    />
+                  ))}
+                </Bar>
+                <Bar 
+                  dataKey="activeTasks" 
+                  name="Active"
+                  fill="#f59e0b"
+                  onMouseEnter={(data: any) => {
+                    if (data && data.projectId) {
+                      setSelectedProject(data.projectId)
+                    }
+                  }}
+                >
+                  {projectProgress.map((entry, index) => (
+                    <Cell
+                      key={`cell-active-${index}`}
+                      fill={selectedProject === entry.projectId ? '#d97706' : '#f59e0b'}
+                      style={{
+                        opacity: selectedProject && selectedProject !== entry.projectId ? 0.5 : 1,
+                        transition: 'all 0.2s ease',
+                      }}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -247,7 +302,11 @@ export default function DashboardClient() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ projectName, progress }) => `${projectName}: ${progress}%`}
+                  label={(entry: any) => {
+                    // Access data from the entry object
+                    const dataEntry = entry as ProjectProgress
+                    return `${dataEntry.projectName}: ${dataEntry.progress}%`
+                  }}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="progress"
@@ -334,6 +393,12 @@ export default function DashboardClient() {
             <BarChart 
               data={productivityByDay}
               onMouseLeave={() => setSelectedDay(null)}
+              onMouseMove={(state: any) => {
+                if (state && state.activePayload && state.activePayload[0]) {
+                  const dayName = state.activePayload[0].payload.dayName
+                  setSelectedDay(dayName)
+                }
+              }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis
@@ -355,12 +420,6 @@ export default function DashboardClient() {
                   fill: isDark ? 'rgba(30, 41, 59, 0.4)' : 'rgba(229, 231, 235, 0.5)',
                   stroke: isDark ? '#334155' : '#9ca3af',
                   strokeWidth: 1,
-                }}
-                onMouseEnter={(data: any) => {
-                  if (data && data.activePayload && data.activePayload[0]) {
-                    const dayName = data.activePayload[0].payload.dayName
-                    setSelectedDay(dayName)
-                  }
                 }}
               />
               <Legend 

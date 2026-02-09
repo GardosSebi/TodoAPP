@@ -51,10 +51,12 @@ export default function Sidebar() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [workspaceName, setWorkspaceName] = useState('Todo App')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
 
   useEffect(() => {
     fetchProjects()
     fetchWorkspace()
+    fetchUnreadNotifications()
     // Initialize theme from localStorage
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null
     const initialTheme = savedTheme || 'dark'
@@ -100,6 +102,46 @@ export default function Sidebar() {
       // Error fetching projects
     }
   }
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const res = await fetch('/api/notifications?unreadOnly=true&limit=100')
+      if (res.ok) {
+        const data = await res.json()
+        const unreadCount = (data.notifications || []).filter((n: any) => !n.read).length
+        setUnreadNotificationCount(unreadCount)
+      }
+    } catch (error) {
+      // Error fetching notifications
+    }
+  }
+
+  // Poll for unread notifications periodically
+  useEffect(() => {
+    fetchUnreadNotifications()
+    const interval = setInterval(fetchUnreadNotifications, 30000) // Every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
+
+  // Refetch when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUnreadNotifications()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  // Listen for notification read events to update count immediately
+  useEffect(() => {
+    const handleNotificationRead = () => {
+      fetchUnreadNotifications()
+    }
+    window.addEventListener('notificationRead', handleNotificationRead)
+    return () => window.removeEventListener('notificationRead', handleNotificationRead)
+  }, [])
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,19 +254,27 @@ export default function Sidebar() {
         {navItems.map((item) => {
           const Icon = item.icon
           const active = isActive(item.href)
+          const isInbox = item.href === '/app'
           return (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition-colors ${
                 active
                   ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                   : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <div className="flex items-center gap-3">
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </div>
+              {isInbox && unreadNotificationCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-semibold bg-blue-600 text-white rounded-full min-w-[20px] text-center">
+                  {unreadNotificationCount}
+                </span>
+              )}
             </Link>
           )
         })}
