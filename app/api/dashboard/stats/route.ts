@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     const accessibleProjects = await prisma.project.findMany({
       where: {
         workspaceId: { in: workspaceIds },
+        archived: false,
         OR: [
           { userId: session.user.id },
           { members: { some: { userId: session.user.id } } },
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
           where: {
             projectId: project.id,
             workspaceId: { in: workspaceIds },
+            archived: false,
           },
         })
 
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest) {
           where: {
             projectId: project.id,
             workspaceId: { in: workspaceIds },
+            archived: false,
             status: 'COMPLETED',
           },
         })
@@ -70,8 +73,9 @@ export async function GET(request: NextRequest) {
           where: {
             projectId: project.id,
             workspaceId: { in: workspaceIds },
+            archived: false,
             status: {
-              in: ['NOT_STARTED', 'IN_PROGRESS'],
+              in: ['ACTIVE', 'NOT_STARTED', 'IN_PROGRESS'],
             },
           },
         })
@@ -106,6 +110,7 @@ export async function GET(request: NextRequest) {
     const completedTasksByPeriod = await prisma.task.findMany({
       where: {
         workspaceId: { in: workspaceIds },
+        archived: false,
         status: 'COMPLETED',
         completed_at: {
           gte: startDate,
@@ -161,6 +166,7 @@ export async function GET(request: NextRequest) {
       const tasksCompleted = await prisma.task.count({
         where: {
           workspaceId: { in: workspaceIds },
+          archived: false,
           status: 'COMPLETED',
           completed_at: {
             gte: dayStart,
@@ -172,6 +178,7 @@ export async function GET(request: NextRequest) {
       const tasksCreated = await prisma.task.count({
         where: {
           workspaceId: { in: workspaceIds },
+          archived: false,
           created_at: {
             gte: dayStart,
             lte: dayEnd,
@@ -194,14 +201,16 @@ export async function GET(request: NextRequest) {
     const totalTasks = await prisma.task.count({
       where: {
         workspaceId: { in: workspaceIds },
+        archived: false,
       },
     })
 
     const activeTasks = await prisma.task.count({
       where: {
         workspaceId: { in: workspaceIds },
+        archived: false,
         status: {
-          in: ['NOT_STARTED', 'IN_PROGRESS'],
+          in: ['ACTIVE', 'NOT_STARTED', 'IN_PROGRESS'],
         },
       },
     })
@@ -209,6 +218,7 @@ export async function GET(request: NextRequest) {
     const completedTasksTotal = await prisma.task.count({
       where: {
         workspaceId: { in: workspaceIds },
+        archived: false,
         status: 'COMPLETED',
       },
     })

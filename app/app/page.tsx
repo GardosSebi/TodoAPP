@@ -15,6 +15,7 @@ export default async function InboxPage() {
     where: {
       userId: session.user.id,
       status: 'ACTIVE',
+      archived: false,
     },
     include: {
       project: {

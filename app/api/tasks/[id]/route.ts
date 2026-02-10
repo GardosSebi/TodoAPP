@@ -13,6 +13,7 @@ const updateTaskSchema = z.object({
   projectId: z.string().uuid().optional().nullable(),
   status: z.enum(['ACTIVE', 'COMPLETED', 'NOT_STARTED', 'IN_PROGRESS', 'FINISHED']).optional(),
   responsible: z.string().max(100).optional().nullable(),
+  archived: z.boolean().optional(),
 })
 
 export async function GET(
@@ -243,6 +244,9 @@ export async function PATCH(
     if (data.responsible !== undefined) {
       // Any workspace member can assign responsible person
       updateData.responsible = data.responsible?.trim() || null
+    }
+    if (data.archived !== undefined) {
+      updateData.archived = data.archived
     }
 
     const task = await prisma.task.update({

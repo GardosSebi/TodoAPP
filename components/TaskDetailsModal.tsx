@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Dialog } from '@headlessui/react'
-import { X, Calendar, Flag, FileText, Upload, Image as ImageIcon, File, Trash2, User, Check, Plus, Tag as TagIcon } from 'lucide-react'
+import { X, Calendar, Flag, FileText, Upload, Image as ImageIcon, File, Trash2, User, Check, Plus, Tag as TagIcon, Archive, ArchiveRestore, Copy, MoreVertical } from 'lucide-react'
 import { Task, TaskFile, SubTask, Tag } from '@/types'
 import { formatDate } from '@/lib/utils'
 import CommentsSection from './CommentsSection'
@@ -52,6 +52,10 @@ export default function TaskDetailsModal({
   const [newTagColor, setNewTagColor] = useState('#3b82f6')
   const [isCreatingTag, setIsCreatingTag] = useState(false)
   const [showTagInput, setShowTagInput] = useState(false)
+  const [archived, setArchived] = useState((task as any).archived || false)
+  const [isArchiving, setIsArchiving] = useState(false)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  const [showActionsMenu, setShowActionsMenu] = useState(false)
 
   useEffect(() => {
     setTitle(task.title)
@@ -62,6 +66,7 @@ export default function TaskDetailsModal({
     setPriority(task.priority)
     setResponsible(task.responsible || '')
     setFiles(task.files || [])
+    setArchived((task as any).archived || false)
     // Fetch files, subtasks, tags and workspace members when modal opens
     if (task.id) {
       fetchFiles()
@@ -537,6 +542,62 @@ export default function TaskDetailsModal({
     }
   }
 
+  const handleArchive = async () => {
+    setIsArchiving(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: !archived }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setArchived(data.task.archived)
+        await onUpdate(task.id, { archived: data.task.archived } as any)
+        if (data.task.archived) {
+          onClose() // Close modal if task is archived
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Eroare la arhivarea sarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la arhivarea sarcinii')
+    } finally {
+      setIsArchiving(false)
+    }
+  }
+
+  const handleDuplicate = async () => {
+    setIsDuplicating(true)
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          includeSubtasks: true,
+          includeFiles: true,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // Close modal and refresh - the new task will appear in the list
+        onClose()
+        // Optionally reload the page or trigger a refresh
+        window.location.reload()
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Eroare la duplicarea sarcinii')
+      }
+    } catch (error) {
+      alert('Eroare la duplicarea sarcinii')
+    } finally {
+      setIsDuplicating(false)
+    }
+  }
+
   return (
     <Dialog open={true} onClose={onClose} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
@@ -918,12 +979,73 @@ export default function TaskDetailsModal({
             </div>
 
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-              >
-                Șterge
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Actions Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowActionsMenu(!showActionsMenu)}
+                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Mai multe acțiuni"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                  
+                  {showActionsMenu && (
+                    <>
+                      {/* Backdrop */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowActionsMenu(false)}
+                      />
+                      {/* Menu */}
+                      <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+                        <button
+                          onClick={() => {
+                            handleDuplicate()
+                            setShowActionsMenu(false)
+                          }}
+                          disabled={isDuplicating}
+                          className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          <Copy className="w-4 h-4" />
+                          Duplică
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleArchive()
+                            setShowActionsMenu(false)
+                          }}
+                          disabled={isArchiving}
+                          className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {archived ? (
+                            <>
+                              <ArchiveRestore className="w-4 h-4" />
+                              Restaurează
+                            </>
+                          ) : (
+                            <>
+                              <Archive className="w-4 h-4" />
+                              Arhivează
+                            </>
+                          )}
+                        </button>
+                        <div className="border-t border-gray-200 dark:border-gray-700" />
+                        <button
+                          onClick={() => {
+                            handleDelete()
+                            setShowActionsMenu(false)
+                          }}
+                          className="w-full px-4 py-2 text-sm text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Șterge
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={onClose}

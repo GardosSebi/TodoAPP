@@ -20,9 +20,10 @@ export async function POST(request: NextRequest) {
     sevenDaysFromNow.setHours(23, 59, 59, 999)
 
     // Find all tasks with due_at within the next 7 days
-    // Exclude completed tasks
+    // Exclude completed tasks and archived tasks
     const tasks = await prisma.task.findMany({
       where: {
+        archived: false,
         due_at: {
           gte: now,
           lte: sevenDaysFromNow,

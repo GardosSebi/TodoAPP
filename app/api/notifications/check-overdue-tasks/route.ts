@@ -18,9 +18,10 @@ export async function POST(request: NextRequest) {
     now.setHours(0, 0, 0, 0)
 
     // Find all tasks with due_at in the past
-    // Exclude completed tasks
+    // Exclude completed tasks and archived tasks
     const tasks = await prisma.task.findMany({
       where: {
+        archived: false,
         due_at: {
           lt: now,
         },

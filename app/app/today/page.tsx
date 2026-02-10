@@ -26,6 +26,7 @@ export default async function TodayPage() {
     where: {
       userId: session.user.id,
       status: 'ACTIVE',
+      archived: false,
       due_at: {
         gte: today,
         lt: tomorrow,
@@ -56,6 +57,7 @@ export default async function TodayPage() {
   const monthTasks = await prisma.task.findMany({
     where: {
       userId: session.user.id,
+      archived: false,
       due_at: {
         not: null,
       },

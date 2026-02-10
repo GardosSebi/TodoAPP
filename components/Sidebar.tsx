@@ -19,6 +19,7 @@ import {
   Menu,
   BarChart3,
   Settings,
+  Archive,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import TeamManagement from './TeamManagement'
@@ -202,6 +203,7 @@ export default function Sidebar() {
     { href: '/app/today', label: 'Calendar', icon: CalendarIcon },
     { href: '/app/upcoming', label: 'Viitoare', icon: ClockIcon },
     { href: '/app/completed', label: 'Finalizate', icon: CheckCircleIcon },
+    { href: '/app/archived', label: 'Arhivate', icon: Archive },
   ]
 
   const isActive = (href: string) => {

@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
       const tasks = await prisma.task.findMany({
         where: {
           workspaceId: { in: workspaceIds },
+          archived: false,
           OR: [
             { title: { contains: query, mode: 'insensitive' } },
             { notes: { contains: query, mode: 'insensitive' } },
@@ -77,23 +78,37 @@ export async function GET(request: NextRequest) {
 
     // Search projects
     if (type === 'all' || type === 'projects') {
-      const projects = await prisma.project.findMany({
+      const projectsRaw = await prisma.project.findMany({
         where: {
           workspaceId: { in: workspaceIds },
+          archived: false,
           OR: [
             { userId: session.user.id },
             { members: { some: { userId: session.user.id } } },
           ],
           name: { contains: query, mode: 'insensitive' },
         },
-        include: {
-          _count: {
-            select: { tasks: true },
-          },
-        },
         take: 20,
         orderBy: { name: 'asc' },
       })
+
+      // Calculate task counts excluding archived tasks
+      const projects = await Promise.all(
+        projectsRaw.map(async (project) => {
+          const taskCount = await prisma.task.count({
+            where: {
+              projectId: project.id,
+              archived: false,
+            },
+          })
+          return {
+            ...project,
+            _count: {
+              tasks: taskCount,
+            },
+          }
+        })
+      )
 
       results.projects = projects.map((project: any) => ({
         ...project,

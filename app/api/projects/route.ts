@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const includeArchived = searchParams.get('includeArchived') === 'true' // Include archived projects
+
     // Get workspaces where user is owner or member
     const userWorkspaces = await prisma.workspace.findMany({
       where: {
@@ -35,16 +38,18 @@ export async function GET(request: NextRequest) {
 
     // Get all projects from accessible workspaces
     // Workspace members have access to all projects in that workspace
+    const where: any = {
+      workspaceId: { in: workspaceIds },
+    }
+
+    // Exclude archived projects by default unless explicitly requested
+    if (!includeArchived) {
+      where.archived = false
+    }
+
     const projects = await prisma.project.findMany({
-      where: {
-        workspaceId: { in: workspaceIds },
-      },
+      where,
       include: {
-        _count: {
-          select: {
-            tasks: true,
-          },
-        },
         user: {
           select: {
             id: true,
@@ -64,8 +69,26 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    // Calculate task counts excluding archived tasks
+    const projectsWithCounts = await Promise.all(
+      projects.map(async (project) => {
+        const taskCount = await prisma.task.count({
+          where: {
+            projectId: project.id,
+            archived: false,
+          },
+        })
+        return {
+          ...project,
+          _count: {
+            tasks: taskCount,
+          },
+        }
+      })
+    )
+
     return NextResponse.json({
-      projects: projects.map((project: any) => ({
+      projects: projectsWithCounts.map((project: any) => ({
         ...project,
         workspace: {
           id: project.workspace.id,

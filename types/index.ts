@@ -11,6 +11,7 @@ export interface Project {
   userId: string
   name: string
   color: string | null
+  archived?: boolean
   created_at: string
   updated_at: string
   workspace?: {
@@ -64,6 +65,7 @@ export interface Task {
   status: 'ACTIVE' | 'COMPLETED' | 'NOT_STARTED' | 'IN_PROGRESS' | 'FINISHED'
   completed_at: string | null
   responsible: string | null
+  archived?: boolean
   created_at: string
   updated_at: string
   project: Project | null

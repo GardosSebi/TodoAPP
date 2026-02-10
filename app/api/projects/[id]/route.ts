@@ -7,6 +7,7 @@ import { z } from 'zod'
 const updateProjectSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+  archived: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -71,6 +72,9 @@ export async function PATCH(
     }
     if (data.color !== undefined) {
       updateData.color = data.color || null
+    }
+    if (data.archived !== undefined) {
+      updateData.archived = data.archived
     }
 
     const updatedProject = await prisma.project.update({

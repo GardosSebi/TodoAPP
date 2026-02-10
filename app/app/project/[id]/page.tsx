@@ -22,6 +22,7 @@ export default async function ProjectPage({
   const project = await prisma.project.findFirst({
     where: {
       id,
+      archived: false,
     },
     include: {
       workspace: {
@@ -55,6 +56,7 @@ export default async function ProjectPage({
   const tasks = await prisma.task.findMany({
     where: {
       projectId: id,
+      archived: false,
     },
     include: {
       project: {

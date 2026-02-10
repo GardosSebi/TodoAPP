@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom') // Date range start
     const dateTo = searchParams.get('dateTo') // Date range end
     const tagIds = searchParams.get('tagIds') // Comma-separated tag IDs
+    const includeArchived = searchParams.get('includeArchived') === 'true' // Include archived tasks
 
     // Get workspaces where user is owner or member
     const userWorkspaces = await prisma.workspace.findMany({
@@ -65,6 +66,11 @@ export async function GET(request: NextRequest) {
     // Workspace members can see all tasks in accessible workspaces
     const where: any = {
       workspaceId: { in: workspaceIds },
+    }
+
+    // Exclude archived tasks by default unless explicitly requested
+    if (!includeArchived) {
+      where.archived = false
     }
 
     if (status) {

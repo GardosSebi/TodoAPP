@@ -25,26 +25,39 @@ export default async function CompletedPage() {
   const workspaceIds = userWorkspaces.map((w) => w.id)
 
   // Fetch all projects from accessible workspaces
-  const projects = workspaceIds.length > 0 ? await prisma.project.findMany({
+  const projectsRaw = workspaceIds.length > 0 ? await prisma.project.findMany({
     where: {
       workspaceId: { in: workspaceIds },
-    },
-    include: {
-      _count: {
-        select: {
-          tasks: true,
-        },
-      },
+      archived: false,
     },
     orderBy: {
       created_at: 'asc',
     },
   }) : []
 
+  // Calculate task counts excluding archived tasks
+  const projects = await Promise.all(
+    projectsRaw.map(async (project) => {
+      const taskCount = await prisma.task.count({
+        where: {
+          projectId: project.id,
+          archived: false,
+        },
+      })
+      return {
+        ...project,
+        _count: {
+          tasks: taskCount,
+        },
+      }
+    })
+  )
+
   // Fetch all completed tasks from all accessible workspaces
   const tasks = workspaceIds.length > 0 ? await prisma.task.findMany({
     where: {
       workspaceId: { in: workspaceIds },
+      archived: false,
       status: 'COMPLETED',
     },
     include: {
