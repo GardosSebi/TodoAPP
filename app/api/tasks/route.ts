@@ -247,7 +247,10 @@ export async function POST(request: NextRequest) {
         where: {
           id: data.projectId,
         },
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          completed: true,
           workspace: {
             select: {
               id: true,
@@ -266,6 +269,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Project not found' },
           { status: 404 }
+        )
+      }
+
+      // Check if project is completed - block creating tasks
+      if (project.completed) {
+        return NextResponse.json(
+          { error: 'Cannot create tasks in a completed project' },
+          { status: 403 }
         )
       }
 

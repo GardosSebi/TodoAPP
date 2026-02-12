@@ -174,7 +174,6 @@ export async function POST(
           }
         } catch (fileError) {
           // Continue with other files if one fails
-          console.error('Error copying file:', fileError)
         }
       }
     }
@@ -254,7 +253,6 @@ export async function POST(
       )
     }
 
-    console.error('Error duplicating task:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

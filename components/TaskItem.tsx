@@ -9,7 +9,7 @@ import TaskDetailsModal from './TaskDetailsModal'
 
 interface TaskItemProps {
   task: Task
-  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>
+  onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
   onDelete: (taskId: string) => void
   onClick?: (task: Task) => void
 }
@@ -17,8 +17,8 @@ interface TaskItemProps {
 export default function TaskItem({ task, onUpdate, onDelete, onClick }: TaskItemProps) {
   const [showDetails, setShowDetails] = useState(false)
 
-  const handleToggleComplete = () => {
-    onUpdate(task.id, {
+  const handleToggleComplete = async () => {
+    await onUpdate(task.id, {
       status: task.status === 'ACTIVE' ? 'COMPLETED' : 'ACTIVE',
     })
   }

@@ -19,12 +19,17 @@ export default async function ProjectPage({
   const { id } = await params
 
   // Check if user has access to project (owner or workspace member)
+  // Allow access even if project is completed (but modifications will be blocked)
   const project = await prisma.project.findFirst({
     where: {
       id,
       archived: false,
     },
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      name: true,
+      completed: true,
       workspace: {
         select: {
           id: true,
@@ -112,6 +117,8 @@ export default async function ProjectPage({
       }))}
       projectId={id}
       projectName={project.name}
+      projectCompleted={project.completed || false}
+      isProjectOwner={project.userId === session.user.id}
     />
   )
 }

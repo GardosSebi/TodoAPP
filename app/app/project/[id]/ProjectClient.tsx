@@ -8,15 +8,19 @@ import AdvancedFilters from '@/components/AdvancedFilters'
 import ImportTasksModal from '@/components/ImportTasksModal'
 import { Task, Tag } from '@/types'
 import { useState, useEffect } from 'react'
-import { Upload } from 'lucide-react'
+import { Upload, CheckCircle, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface ProjectClientProps {
   initialTasks: Task[]
   projectId: string
   projectName: string
+  projectCompleted: boolean
+  isProjectOwner: boolean
 }
 
-export default function ProjectClient({ initialTasks, projectId, projectName }: ProjectClientProps) {
+export default function ProjectClient({ initialTasks, projectId, projectName, projectCompleted, isProjectOwner }: ProjectClientProps) {
+  const router = useRouter()
   const [tasks, setTasks] = useState(initialTasks)
   const [filteredTasks, setFilteredTasks] = useState(initialTasks)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -25,6 +29,9 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [showImportModal, setShowImportModal] = useState(false)
+  const [completed, setCompleted] = useState(projectCompleted)
+  const [isCompleting, setIsCompleting] = useState(false)
+  const [isReopening, setIsReopening] = useState(false)
 
   useEffect(() => {
     fetchProjects()
@@ -130,6 +137,10 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   }
 
   const handleAddTask = async (title: string, description?: string, deadline?: string, priority?: number) => {
+    if (completed) {
+      return // Block adding tasks when project is completed
+    }
+
     try {
       let dueAt: string | null = null
       if (deadline) {
@@ -163,6 +174,10 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   }
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    if (completed) {
+      return // Block updates when project is completed
+    }
+
     // Optimistic update
     setTasks((prev) =>
       prev.map((task) => (task.id === taskId ? { ...task, ...updates } : task))
@@ -191,6 +206,10 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   }
 
   const handleTaskDelete = async (taskId: string) => {
+    if (completed) {
+      return // Block deletion when project is completed
+    }
+
     // Optimistic update
     setTasks((prev) => prev.filter((task) => task.id !== taskId))
 
@@ -206,6 +225,55 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
       }
     } catch (error) {
       // Error('Error deleting task:', error)
+    }
+  }
+
+  // Check if all tasks are completed
+  const allTasksCompleted = tasks.length > 0 && tasks.every(
+    (task) => task.status === 'COMPLETED' || task.status === 'FINISHED'
+  )
+
+  const handleCompleteProject = async () => {
+    if (!allTasksCompleted || completed) {
+      return
+    }
+
+    setIsCompleting(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/complete`, {
+        method: 'POST',
+      })
+
+      if (res.ok) {
+        setCompleted(true)
+        router.refresh()
+      }
+    } catch (error) {
+      // Error handling
+    } finally {
+      setIsCompleting(false)
+    }
+  }
+
+  const handleReopenProject = async () => {
+    if (!completed || !isProjectOwner) {
+      return
+    }
+
+    setIsReopening(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/reopen`, {
+        method: 'POST',
+      })
+
+      if (res.ok) {
+        setCompleted(false)
+        router.refresh()
+      }
+    } catch (error) {
+      // Error handling
+    } finally {
+      setIsReopening(false)
     }
   }
 
@@ -259,53 +327,99 @@ export default function ProjectClient({ initialTasks, projectId, projectName }: 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">{projectName}</h1>
-        <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">
-          {Object.keys(filters).length > 0 ? (
-            <>
-              {filteredTasks.length} din {tasks.length} {tasks.length === 1 ? 'sarcină' : 'sarcini'}
-            </>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">{projectName}</h1>
+              {completed && (
+                <span className="px-2 py-1 text-xs font-semibold text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900 rounded">
+                  Finalizat
+                </span>
+              )}
+            </div>
+            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">
+              {Object.keys(filters).length > 0 ? (
+                <>
+                  {filteredTasks.length} din {tasks.length} {tasks.length === 1 ? 'sarcină' : 'sarcini'}
+                </>
+              ) : (
+                <>
+                  {tasks.length} {tasks.length === 1 ? 'sarcină' : 'sarcini'}
+                </>
+              )}
+            </p>
+          </div>
+          {completed ? (
+            isProjectOwner && (
+              <button
+                onClick={handleReopenProject}
+                disabled={isReopening}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {isReopening ? 'Repornire...' : 'Repornește Proiectul'}
+              </button>
+            )
           ) : (
-            <>
-              {tasks.length} {tasks.length === 1 ? 'sarcină' : 'sarcini'}
-            </>
+            allTasksCompleted && (
+              <button
+                onClick={handleCompleteProject}
+                disabled={isCompleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 dark:bg-green-500 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {isCompleting ? 'Finalizare...' : 'Finalizează Proiectul'}
+              </button>
+            )
           )}
-        </p>
+        </div>
       </div>
 
-      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="flex-1">
-          <QuickAddTask onAdd={handleAddTask} projectId={projectId} placeholder="Adaugă o sarcină la acest proiect..." />
+      {!completed && (
+        <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex-1">
+            <QuickAddTask onAdd={handleAddTask} projectId={projectId} placeholder="Adaugă o sarcină la acest proiect..." />
+          </div>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline">Import Sarcini</span>
+            <span className="sm:hidden">Import</span>
+          </button>
         </div>
-        <button
-          onClick={() => setShowImportModal(true)}
-          className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-        >
-          <Upload className="w-4 h-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Import Sarcini</span>
-          <span className="sm:hidden">Import</span>
-        </button>
-      </div>
+      )}
+      {completed && (
+        <div className="mb-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Acest proiect este finalizat. Nu se mai pot face modificări la task-uri.
+            {isProjectOwner && ' Doar tu, ca owner, poți reporni proiectul.'}
+          </p>
+        </div>
+      )}
 
       {/* Search and Filters */}
-      <div className="mb-4 md:mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-          <div className="flex-1 w-full">
-            <SearchBar />
+      {!completed && (
+        <div className="mb-4 md:mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1 w-full">
+              <SearchBar />
+            </div>
+            <AdvancedFilters
+              onFiltersChange={setFilters}
+              projects={projects}
+              workspaceMembers={workspaceMembers}
+              tags={tags}
+            />
           </div>
-          <AdvancedFilters
-            onFiltersChange={setFilters}
-            projects={projects}
-            workspaceMembers={workspaceMembers}
-            tags={tags}
-          />
         </div>
-      </div>
+      )}
 
       <div className="mb-6">
         <KanbanBoard
           tasks={filteredTasks}
-          onTaskUpdate={handleTaskUpdate}
+          onTaskUpdate={completed ? () => {} : handleTaskUpdate}
           onTaskClick={setSelectedTask}
         />
       </div>

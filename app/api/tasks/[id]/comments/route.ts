@@ -71,7 +71,6 @@ export async function GET(
 
     return NextResponse.json({ comments: formattedComments })
   } catch (error) {
-    console.error('Error fetching comments:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -286,7 +285,6 @@ export async function POST(
         { status: 400 }
       )
     }
-    console.error('Error creating comment:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

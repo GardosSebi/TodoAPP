@@ -155,11 +155,25 @@ export async function PATCH(
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            completed: true,
+          },
+        },
       },
     })
 
     if (!existingTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    // Check if project is completed - block all modifications
+    if (existingTask.project?.completed) {
+      return NextResponse.json(
+        { error: 'Cannot modify tasks in a completed project' },
+        { status: 403 }
+      )
     }
 
     // Check access: user is task owner OR workspace owner OR workspace member
@@ -491,11 +505,25 @@ export async function DELETE(
             },
           },
         },
+        project: {
+          select: {
+            id: true,
+            completed: true,
+          },
+        },
       },
     })
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    // Check if project is completed - block deletion
+    if (task.project?.completed) {
+      return NextResponse.json(
+        { error: 'Cannot delete tasks in a completed project' },
+        { status: 403 }
+      )
     }
 
     // Check access: user is task owner OR workspace owner OR workspace member

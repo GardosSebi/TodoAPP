@@ -9,7 +9,7 @@ interface TaskListProps {
   initialTasks: Task[]
   view?: string
   onTaskClick?: (task: Task) => void
-  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void
+  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>
   onTaskDelete?: (taskId: string) => void
 }
 
@@ -35,7 +35,7 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
     )
 
     if (onTaskUpdate) {
-      onTaskUpdate(taskId, updates)
+      await onTaskUpdate(taskId, updates)
       return
     }
 
@@ -136,6 +136,9 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
     (task) => task.status === 'COMPLETED'
   )
 
+  // Don't show completed tasks in inbox view
+  const shouldShowCompleted = view !== 'completed' && view !== 'inbox' && completedTasks.length > 0
+
   return (
     <div className="space-y-6">
       <AnimatePresence>
@@ -164,7 +167,7 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
         </div>
       )}
 
-      {view !== 'completed' && completedTasks.length > 0 && (
+      {shouldShowCompleted && (
         <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
             Finalizate ({completedTasks.length})

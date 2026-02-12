@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { Check, X, Users, Mail, AtSign, UserCheck, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import TaskList from '@/components/TaskList'
-import TaskDetailsModal from '@/components/TaskDetailsModal'
-import { Task } from '@/types'
+// TaskList removed - tasks are no longer displayed in inbox page
+// import TaskList from '@/components/TaskList'
+// import TaskDetailsModal from '@/components/TaskDetailsModal'
+// import { Task } from '@/types'
 
 interface Invitation {
   id: string
@@ -33,7 +34,7 @@ interface Notification {
 }
 
 interface InboxClientProps {
-  initialTasks: any[]
+  initialTasks: any[] // Not used anymore, but kept for compatibility
   initialInvitations: Invitation[]
   initialNotifications: Notification[]
 }
@@ -47,30 +48,37 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
   const [notifications, setNotifications] = useState<Notification[]>(sortedInitialNotifications)
   const [notificationFilters, setNotificationFilters] = useState<string[]>([]) // Array of selected filter types, empty = all
   const [processing, setProcessing] = useState<string | null>(null)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  // Tasks are no longer displayed in inbox page
+  // const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const router = useRouter()
 
   // Fetch notifications periodically and on visibility change
   useEffect(() => {
+    let isMounted = true
+    
     const fetchNotifications = async () => {
       try {
         const res = await fetch('/api/notifications?limit=50')
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json()
           // Sort notifications by date (most recent first)
           const sorted = (data.notifications || []).sort(
             (a: Notification, b: Notification) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
+          // Always update notifications when fetch succeeds
           setNotifications(sorted)
         }
       } catch (error) {
-        // Error fetching notifications
+        // Error fetching notifications - keep existing notifications
       }
     }
 
-    // Fetch on mount
-    fetchNotifications()
+    // Don't fetch immediately - use initialNotifications first
+    // Only fetch after a delay to allow initial render
+    const timeoutId = setTimeout(() => {
+      fetchNotifications()
+    }, 500)
 
     // Refetch when page becomes visible
     const handleVisibilityChange = () => {
@@ -85,23 +93,41 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
     const interval = setInterval(fetchNotifications, 30000)
 
     return () => {
+      isMounted = false
+      clearTimeout(timeoutId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       clearInterval(interval)
     }
   }, [])
 
-  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
-    // TaskList handles its own updates
-    if (selectedTask?.id === taskId) {
-      setSelectedTask({ ...selectedTask, ...updates })
-    }
-  }
+  // Task handlers removed - tasks are no longer displayed in inbox page
+  // const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+  //   // TaskList handles its own updates
+  //   if (selectedTask?.id === taskId) {
+  //     setSelectedTask({ ...selectedTask, ...updates })
+  //   }
+  //   
+  //   // Refresh notifications after task update to ensure they're still visible
+  //   try {
+  //     const res = await fetch('/api/notifications?limit=50')
+  //     if (res.ok) {
+  //       const data = await res.json()
+  //       const sorted = (data.notifications || []).sort(
+  //         (a: Notification, b: Notification) =>
+  //           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  //       )
+  //       setNotifications(sorted)
+  //     }
+  //   } catch (error) {
+  //     // Error fetching notifications - ignore
+  //   }
+  // }
 
-  const handleTaskDelete = async (taskId: string) => {
-    if (selectedTask?.id === taskId) {
-      setSelectedTask(null)
-    }
-  }
+  // const handleTaskDelete = async (taskId: string) => {
+  //   if (selectedTask?.id === taskId) {
+  //     setSelectedTask(null)
+  //   }
+  // }
 
   const handleAcceptInvitation = async (invitationId: string) => {
     setProcessing(invitationId)
@@ -276,20 +302,22 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
-      {notifications.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              Notificări
-              {unreadCount > 0 && (
-                <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full">
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
-          </div>
-          
+      {/* Notifications Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Notificări
+            {unreadCount > 0 && (
+              <span className="ml-2 px-2 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </h2>
+        </div>
+
+        {notifications.length > 0 ? (
+          <>
           {/* Filter Buttons */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
@@ -495,8 +523,14 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
               <p>Nu există notificări pentru filtrul selectat.</p>
             </div>
           )}
-        </div>
-      )}
+          </>
+        ) : (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>Nu ai notificări.</p>
+          </div>
+        )}
+      </div>
 
       {invitations.length > 0 && (
         <div className="mb-6">
@@ -548,24 +582,24 @@ export default function InboxClient({ initialTasks, initialInvitations, initialN
         </div>
       )}
 
-      {/* Task List */}
-      <TaskList
+      {/* Task List removed - tasks are no longer displayed in inbox page */}
+      {/* <TaskList
         initialTasks={initialTasks}
         view="inbox"
         onTaskClick={(task) => setSelectedTask(task)}
         onTaskUpdate={handleTaskUpdate}
         onTaskDelete={handleTaskDelete}
-      />
+      /> */}
 
-      {/* Task Details Modal */}
-      {selectedTask && (
+      {/* Task Details Modal removed */}
+      {/* {selectedTask && (
         <TaskDetailsModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdate={handleTaskUpdate}
           onDelete={handleTaskDelete}
         />
-      )}
+      )} */}
     </div>
   )
 }

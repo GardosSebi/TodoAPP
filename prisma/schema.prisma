@@ -45,6 +45,7 @@ model User {
   activities   Activity[]
   filterPresets FilterPreset[]
   notifications Notification[]
+  taskTemplates TaskTemplate[]
 
   @@index([email])
   @@index([role])
@@ -62,6 +63,7 @@ model Workspace {
   invitations WorkspaceInvitation[]
   activities Activity[]
   tags       Tag[]
+  taskTemplates TaskTemplate[]
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -108,6 +110,7 @@ model Project {
   name       String   @db.VarChar(60)
   color      String?
   archived   Boolean  @default(false)
+  completed  Boolean  @default(false)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -118,6 +121,7 @@ model Project {
   @@index([userId])
   @@index([workspaceId])
   @@index([archived])
+  @@index([completed])
 }
 
 model TeamMember {
@@ -299,5 +303,27 @@ model TaskTag {
   @@unique([taskId, tagId])
   @@index([taskId])
   @@index([tagId])
+}
+
+model TaskTemplate {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  title       String   @db.VarChar(120)
+  notes       String?  @db.Text
+  priority    Int      @default(0) // 0=none, 1=low, 2=med, 3=high
+  responsible String?  @db.VarChar(100)
+  subtasks    String   @db.Text // JSON array of subtask titles
+  tagIds      String   @db.Text // JSON array of tag IDs
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([name])
 }
 

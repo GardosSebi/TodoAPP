@@ -11,32 +11,21 @@ export default async function InboxPage() {
     redirect('/login')
   }
 
-  const tasks = await prisma.task.findMany({
+  // Get workspaces where user is owner or member
+  const userWorkspaces = await prisma.workspace.findMany({
     where: {
-      userId: session.user.id,
-      status: 'ACTIVE',
-      archived: false,
+      OR: [
+        { userId: session.user.id },
+        { members: { some: { userId: session.user.id } } },
+      ],
     },
-    include: {
-      project: {
-        select: {
-          id: true,
-          name: true,
-          color: true,
-        },
-      },
-      files: {
-        orderBy: {
-          uploaded_at: 'desc',
-        },
-      },
-    } as any,
-    orderBy: [
-      { priority: 'desc' },
-      { due_at: 'asc' },
-      { created_at: 'desc' },
-    ],
+    select: { id: true },
   })
+
+  const workspaceIds = userWorkspaces.map((w) => w.id)
+
+  // Tasks are no longer displayed in the inbox page
+  const tasks: any[] = []
 
   const invitations = await prisma.workspaceInvitation.findMany({
     where: {

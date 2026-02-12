@@ -12,6 +12,7 @@ export interface Project {
   name: string
   color: string | null
   archived?: boolean
+  completed?: boolean
   created_at: string
   updated_at: string
   workspace?: {
@@ -72,5 +73,21 @@ export interface Task {
   files?: TaskFile[]
   subtasks?: SubTask[]
   tags?: Tag[]
+}
+
+export interface TaskTemplate {
+  id: string
+  userId: string
+  workspaceId: string
+  name: string
+  description: string | null
+  title: string
+  notes: string | null
+  priority: number
+  responsible: string | null
+  subtasks: string[]
+  tagIds: string[]
+  created_at: string
+  updated_at: string
 }
 

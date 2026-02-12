@@ -63,7 +63,6 @@ export async function sendEmail(notification: EmailNotification): Promise<boolea
       code: error?.code || null,
     }
     
-    console.error('[Email] Error sending email:', JSON.stringify(errorDetails, null, 2))
     
     // Don't throw - email failures shouldn't break the app
     return false
