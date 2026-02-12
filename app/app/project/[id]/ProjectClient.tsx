@@ -420,11 +420,12 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
         <KanbanBoard
           tasks={filteredTasks}
           onTaskUpdate={completed ? () => {} : handleTaskUpdate}
-          onTaskClick={setSelectedTask}
+          onTaskClick={completed ? () => {} : setSelectedTask} // Only allow opening modal if project is not completed
         />
       </div>
 
-      {selectedTask && (
+      {/* Task Details Modal - only show if project is not completed */}
+      {selectedTask && !completed && (
         <TaskDetailsModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
