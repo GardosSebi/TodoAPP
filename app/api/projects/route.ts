@@ -64,9 +64,14 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        created_at: 'asc',
-      },
+      orderBy: [
+        {
+          order: 'asc',
+        },
+        {
+          created_at: 'asc',
+        },
+      ],
     })
 
     // Calculate task counts excluding archived tasks
@@ -90,6 +95,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       projects: projectsWithCounts.map((project: any) => ({
         ...project,
+        completed: project.completed || false,
+        order: project.order ?? 0,
         workspace: {
           id: project.workspace.id,
           name: project.workspace.name,
@@ -129,12 +136,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get the max order value for this workspace to add new project at the end
+    const maxOrder = await prisma.project.aggregate({
+      where: {
+        workspaceId: user.workspaceId,
+      },
+      _max: {
+        order: true,
+      },
+    })
+
     const project = await prisma.project.create({
       data: {
         userId: session.user.id,
         workspaceId: user.workspaceId,
         name: data.name.trim(),
         color: data.color || null,
+        order: (maxOrder._max.order ?? -1) + 1,
       },
     })
 

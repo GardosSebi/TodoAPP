@@ -97,14 +97,18 @@ export default function TaskItem({ task, onUpdate, onDelete, onClick }: TaskItem
             {task.project && (
               <span
                 className={`text-xs px-2 py-0.5 rounded ${
-                  task.project.color 
-                    ? '' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white'
+                  task.project.completed
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : task.project.color 
+                      ? '' 
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white'
                 }`}
-                style={task.project.color ? {
-                  backgroundColor: `${task.project.color}20`,
-                  color: task.project.color,
-                } : undefined}
+                style={task.project.completed 
+                  ? undefined
+                  : task.project.color ? {
+                      backgroundColor: `${task.project.color}20`,
+                      color: task.project.color,
+                    } : undefined}
               >
                 {task.project.name}
               </span>

@@ -109,7 +109,7 @@ export default function CompletedClient({ projects, tasks }: CompletedClientProp
               <Folder
                 className="w-5 h-5"
                 style={{
-                  color: project.color || '#6b7280',
+                  color: project.completed ? '#10b981' : (project.color || '#6b7280'),
                 }}
               />
               <div className="flex-1 text-left">

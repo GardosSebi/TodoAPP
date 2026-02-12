@@ -13,6 +13,7 @@ export interface Project {
   color: string | null
   archived?: boolean
   completed?: boolean
+  order?: number
   created_at: string
   updated_at: string
   workspace?: {

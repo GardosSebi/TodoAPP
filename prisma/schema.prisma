@@ -111,6 +111,7 @@ model Project {
   color      String?
   archived   Boolean  @default(false)
   completed  Boolean  @default(false)
+  order      Int      @default(0) // For custom ordering in sidebar
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -122,6 +123,7 @@ model Project {
   @@index([workspaceId])
   @@index([archived])
   @@index([completed])
+  @@index([order])
 }
 
 model TeamMember {

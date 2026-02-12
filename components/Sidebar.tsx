@@ -21,15 +21,143 @@ import {
   Settings,
   Archive,
   FileText,
+  MessageCircle,
+  GripVertical,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import TeamManagement from './TeamManagement'
 import WorkspaceMembers from './WorkspaceMembers'
+import AIHelper from './AIHelper'
+
+// Sortable Project Item Component
+function SortableProjectItem({
+  project,
+  pathname,
+  session,
+  onDelete,
+  onMobileMenuClose,
+}: {
+  project: Project
+  pathname: string
+  session: any
+  onDelete: (id: string, e: React.MouseEvent) => void
+  onMobileMenuClose: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id })
+
+  // Restrict movement to vertical only (ignore horizontal movement)
+  const restrictedTransform = transform
+    ? {
+        ...transform,
+        x: 0, // Force x to 0 to prevent horizontal movement
+      }
+    : null
+
+  const style = {
+    transform: restrictedTransform ? CSS.Transform.toString(restrictedTransform) : undefined,
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const active = pathname === `/app/project/${project.id}`
+  const isShared = project.user && project.user.id !== session?.user?.id
+  const isFromOtherWorkspace = project.workspace && project.workspace.userId !== session?.user?.id
+  const isOwner = project.user && project.user.id === session?.user?.id
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative flex flex-col gap-1 px-3 py-2 rounded-lg transition-colors ${
+        project.completed
+          ? active
+            ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+            : 'bg-green-50/50 text-green-700 hover:bg-green-50 dark:bg-green-900/20 dark:text-green-300 dark:hover:bg-green-900/30'
+          : active
+            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+            : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
+      } ${isDragging ? 'cursor-grabbing' : ''}`}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 flex-shrink-0"
+          title="Trage pentru a reordona"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <Link
+          href={`/app/project/${project.id}`}
+          onClick={onMobileMenuClose}
+          className="flex items-center gap-3 flex-1 min-w-0"
+        >
+          <FolderIcon
+            className="w-5 h-5 flex-shrink-0"
+            style={{
+              color: project.completed ? '#10b981' : (project.color || '#9ca3af'),
+            }}
+          />
+          <span className="flex-1 truncate font-medium">{project.name}</span>
+          {isShared && (
+            <span className="text-xs text-blue-600 dark:text-blue-400" title="Proiect partajat">
+              •
+            </span>
+          )}
+        </Link>
+        <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+          {project._count.tasks}
+        </span>
+        {isOwner && (
+          <button
+            onClick={(e) => onDelete(project.id, e)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+            title="Șterge proiect"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {project.workspace && isFromOtherWorkspace && (
+        <div className="flex items-center gap-2 pl-8">
+          <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={project.workspace.name}>
+            {project.workspace.name}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface Project {
   id: string
   name: string
   color: string | null
+  completed?: boolean
   _count: {
     tasks: number
   }
@@ -55,6 +183,18 @@ export default function Sidebar() {
   const [workspaceName, setWorkspaceName] = useState('Todo App')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const [showAIHelper, setShowAIHelper] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px of movement before starting drag
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     fetchProjects()
@@ -103,6 +243,45 @@ export default function Sidebar() {
       }
     } catch (error) {
       // Error fetching projects
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = projects.findIndex((p) => p.id === active.id)
+    const newIndex = projects.findIndex((p) => p.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // Optimistically update the UI
+    const newProjects = arrayMove(projects, oldIndex, newIndex)
+    setProjects(newProjects)
+
+    // Save the new order to the server
+    try {
+      const projectIds = newProjects.map((p) => p.id)
+      const res = await fetch('/api/projects/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectIds }),
+      })
+
+      if (!res.ok) {
+        // Revert on error
+        setProjects(projects)
+        throw new Error('Failed to reorder projects')
+      }
+    } catch (error) {
+      // Revert on error
+      setProjects(projects)
+      console.error('Error reordering projects:', error)
     }
   }
 
@@ -336,64 +515,29 @@ export default function Sidebar() {
             </motion.form>
           )}
 
-          <div className="space-y-1">
-            {projects.map((project) => {
-              const active = pathname === `/app/project/${project.id}`
-              const isShared = project.user && project.user.id !== session?.user?.id
-              const isFromOtherWorkspace = project.workspace && project.workspace.userId !== session?.user?.id
-              const isOwner = project.user && project.user.id === session?.user?.id
-              return (
-                <div
-                  key={project.id}
-                  className={`group relative flex flex-col gap-1 px-3 py-2 rounded-lg transition-colors ${
-                    active
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                      : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Link
-                      href={`/app/project/${project.id}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="flex items-center gap-3 flex-1 min-w-0"
-                    >
-                      <FolderIcon
-                        className="w-5 h-5 flex-shrink-0"
-                        style={{
-                          color: project.color || '#9ca3af',
-                        }}
-                      />
-                      <span className="flex-1 truncate font-medium">{project.name}</span>
-                      {isShared && (
-                        <span className="text-xs text-blue-600 dark:text-blue-400" title="Proiect partajat">
-                          •
-                        </span>
-                      )}
-                    </Link>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-                      {project._count.tasks}
-                    </span>
-                    {isOwner && (
-                      <button
-                        onClick={(e) => handleDeleteProject(project.id, e)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400"
-                        title="Șterge proiect"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                  {project.workspace && isFromOtherWorkspace && (
-                    <div className="flex items-center gap-2 pl-8">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={project.workspace.name}>
-                        {project.workspace.name}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={projects.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-1">
+                {projects.map((project) => (
+                  <SortableProjectItem
+                    key={project.id}
+                    project={project}
+                    pathname={pathname}
+                    session={session}
+                    onDelete={handleDeleteProject}
+                    onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       </nav>
 
@@ -438,6 +582,18 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+
+    {/* AI Helper Floating Button */}
+    <button
+      onClick={() => setShowAIHelper(true)}
+      className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center z-40 transition-all hover:scale-110"
+      title="AI Helper"
+    >
+      <MessageCircle className="w-6 h-6" />
+    </button>
+
+    {/* AI Helper Modal */}
+    <AIHelper isOpen={showAIHelper} onClose={() => setShowAIHelper(false)} />
     </>
   )
 }

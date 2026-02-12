@@ -174,9 +174,18 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
                       onClick={() => handleProjectClick(project.id)}
                       className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-3"
                     >
-                      <Folder className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <Folder 
+                        className="w-4 h-4 flex-shrink-0"
+                        style={{
+                          color: (project as any).completed ? '#10b981' : '#9ca3af',
+                        }}
+                      />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                        <div className={`font-medium truncate ${
+                          (project as any).completed 
+                            ? 'text-green-700 dark:text-green-300' 
+                            : 'text-gray-900 dark:text-white'
+                        }`}>
                           {project.name}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
