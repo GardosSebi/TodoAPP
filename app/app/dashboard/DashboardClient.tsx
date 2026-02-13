@@ -295,42 +295,74 @@ export default function DashboardClient() {
             Distribuție Proiecte
           </h2>
           {projectProgress.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={projectProgress}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry: any) => {
-                    // Access data from the entry object
-                    const dataEntry = entry as ProjectProgress
-                    return `${dataEntry.projectName}: ${dataEntry.progress}%`
-                  }}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="progress"
-                >
+            <div>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={projectProgress}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="progress"
+                  >
+                    {projectProgress.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.projectColor || COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: tooltipBg,
+                      border: `1px solid ${tooltipBorder}`,
+                      borderRadius: '8px',
+                      color: tooltipText,
+                      boxShadow: isDark ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    }}
+                    labelStyle={{ color: tooltipText, fontWeight: 'bold' }}
+                    itemStyle={{ color: tooltipText }}
+                    formatter={(value: any, name: any, props: any) => {
+                      const numValue = typeof value === 'number' ? value : 0
+                      const projectName = props?.payload?.projectName || name || ''
+                      return [`${numValue}%`, projectName]
+                    }}
+                    labelFormatter={(label: any, payload: any) => {
+                      if (payload && payload.length > 0 && payload[0]?.payload?.projectName) {
+                        return payload[0].payload.projectName
+                      }
+                      return label || ''
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Legend for projects */}
+              <div className="mt-4 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {projectProgress.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={entry.projectColor || COLORS[index % COLORS.length]}
-                    />
+                    <div
+                      key={`legend-${index}`}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: entry.projectColor || COLORS[index % COLORS.length],
+                        }}
+                      />
+                      <span className="text-gray-700 dark:text-gray-300 truncate flex-1">
+                        {entry.projectName}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400 font-medium">
+                        {entry.progress}%
+                      </span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: tooltipBg,
-                    border: `1px solid ${tooltipBorder}`,
-                    borderRadius: '8px',
-                    color: tooltipText,
-                    boxShadow: isDark ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  }}
-                  labelStyle={{ color: tooltipText }}
-                  itemStyle={{ color: tooltipText }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
               Nu există proiecte

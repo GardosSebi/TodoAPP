@@ -325,6 +325,58 @@ export default function Sidebar() {
     return () => window.removeEventListener('notificationRead', handleNotificationRead)
   }, [])
 
+  // Listen for task creation/deletion events to update project task counts
+  useEffect(() => {
+    const handleTaskCreated = () => {
+      fetchProjects()
+    }
+    const handleTaskDeleted = () => {
+      fetchProjects()
+    }
+    window.addEventListener('taskCreated', handleTaskCreated)
+    window.addEventListener('taskDeleted', handleTaskDeleted)
+    return () => {
+      window.removeEventListener('taskCreated', handleTaskCreated)
+      window.removeEventListener('taskDeleted', handleTaskDeleted)
+    }
+  }, [])
+
+  // Listen for project events (archived, created, deleted, reopened, completed) to update project list
+  useEffect(() => {
+    const handleProjectArchived = () => {
+      fetchProjects()
+    }
+    const handleProjectCreated = () => {
+      fetchProjects()
+    }
+    const handleProjectDeleted = () => {
+      fetchProjects()
+    }
+    const handleProjectRestored = () => {
+      fetchProjects()
+    }
+    const handleProjectReopened = () => {
+      fetchProjects()
+    }
+    const handleProjectCompleted = () => {
+      fetchProjects()
+    }
+    window.addEventListener('projectArchived', handleProjectArchived)
+    window.addEventListener('projectCreated', handleProjectCreated)
+    window.addEventListener('projectDeleted', handleProjectDeleted)
+    window.addEventListener('projectRestored', handleProjectRestored)
+    window.addEventListener('projectReopened', handleProjectReopened)
+    window.addEventListener('projectCompleted', handleProjectCompleted)
+    return () => {
+      window.removeEventListener('projectArchived', handleProjectArchived)
+      window.removeEventListener('projectCreated', handleProjectCreated)
+      window.removeEventListener('projectDeleted', handleProjectDeleted)
+      window.removeEventListener('projectRestored', handleProjectRestored)
+      window.removeEventListener('projectReopened', handleProjectReopened)
+      window.removeEventListener('projectCompleted', handleProjectCompleted)
+    }
+  }, [])
+
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newProjectName.trim()) return
@@ -339,6 +391,8 @@ export default function Sidebar() {
       if (res.ok) {
         setNewProjectName('')
         setShowNewProject(false)
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('projectCreated'))
         fetchProjects()
       }
     } catch (error) {
@@ -360,6 +414,10 @@ export default function Sidebar() {
       })
 
       if (res.ok) {
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('projectDeleted', { 
+          detail: { projectId } 
+        }))
         // If user is currently viewing the deleted project, redirect to inbox
         if (pathname === `/app/project/${projectId}`) {
           router.push('/app')

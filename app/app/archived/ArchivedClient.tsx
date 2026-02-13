@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Archive, ArchiveRestore, Trash2, Folder } from 'lucide-react'
+import { Archive, ArchiveRestore, Trash2, Folder, FileText } from 'lucide-react'
 import { Task, Project } from '@/types'
 import { formatDate } from '@/lib/utils'
 import TaskDetailsModal from '@/components/TaskDetailsModal'
@@ -11,11 +11,14 @@ interface ArchivedClientProps {
   initialProjects: Project[]
 }
 
+type ViewType = 'tasks' | 'projects' | 'all'
+
 export default function ArchivedClient({ initialTasks, initialProjects }: ArchivedClientProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isRestoring, setIsRestoring] = useState<string | null>(null)
+  const [view, setView] = useState<ViewType>('all')
 
   const handleRestoreTask = async (taskId: string) => {
     setIsRestoring(taskId)
@@ -50,6 +53,10 @@ export default function ArchivedClient({ initialTasks, initialProjects }: Archiv
 
       if (res.ok) {
         setProjects(projects.filter(p => p.id !== projectId))
+        // Dispatch event to notify sidebar to update project list
+        window.dispatchEvent(new CustomEvent('projectRestored', { 
+          detail: { projectId } 
+        }))
       } else {
         const error = await res.json()
         alert(error.error || 'Eroare la restaurarea proiectului')
@@ -114,19 +121,56 @@ export default function ArchivedClient({ initialTasks, initialProjects }: Archiv
     }
   }
 
+  const showProjects = view === 'projects' || view === 'all'
+  const showTasks = view === 'tasks' || view === 'all'
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-4">
           Arhivate
         </h1>
-        <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">
-          Sarcini: {tasks.length} • Proiecte: {projects.length}
-        </p>
+        
+        {/* View Selector */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setView('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              view === 'all'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            Toate ({tasks.length + projects.length})
+          </button>
+          <button
+            onClick={() => setView('tasks')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              view === 'tasks'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Sarcini ({tasks.length})
+          </button>
+          <button
+            onClick={() => setView('projects')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              view === 'projects'
+                ? 'bg-blue-600 text-white dark:bg-blue-500'
+                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Folder className="w-4 h-4" />
+            Proiecte ({projects.length})
+          </button>
+        </div>
       </div>
 
       {/* Archived Projects */}
-      {projects.length > 0 && (
+      {showProjects && projects.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <Folder className="w-5 h-5" />
@@ -161,7 +205,7 @@ export default function ArchivedClient({ initialTasks, initialProjects }: Archiv
                     className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 flex items-center gap-2"
                   >
                     <ArchiveRestore className="w-4 h-4" />
-                    Restaurează
+                    
                   </button>
                   <button
                     onClick={() => handleDeleteProject(project.id)}
@@ -177,9 +221,10 @@ export default function ArchivedClient({ initialTasks, initialProjects }: Archiv
       )}
 
       {/* Archived Tasks */}
-      {tasks.length > 0 && (
+      {showTasks && tasks.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5" />
             Sarcini Arhivate ({tasks.length})
           </h2>
           <div className="space-y-2">
@@ -243,6 +288,17 @@ export default function ArchivedClient({ initialTasks, initialProjects }: Archiv
           <Archive className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
           <p className="text-gray-500 dark:text-gray-400">
             Nu există sarcini sau proiecte arhivate
+          </p>
+        </div>
+      )}
+
+      {((view === 'tasks' && tasks.length === 0) || (view === 'projects' && projects.length === 0)) && (
+        <div className="text-center py-12">
+          <Archive className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">
+            {view === 'tasks' 
+              ? 'Nu există sarcini arhivate'
+              : 'Nu există proiecte arhivate'}
           </p>
         </div>
       )}

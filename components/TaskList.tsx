@@ -62,11 +62,19 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
   }
 
   const handleTaskDelete = async (taskId: string) => {
+    // Get the task to find its projectId before deleting
+    const taskToDelete = tasks.find((task) => task.id === taskId)
+    const projectId = taskToDelete?.projectId || null
+
     // Optimistic update
     setTasks((prev) => prev.filter((task) => task.id !== taskId))
 
     if (onTaskDelete) {
       onTaskDelete(taskId)
+      // Dispatch event to notify sidebar to update task counts
+      window.dispatchEvent(new CustomEvent('taskDeleted', { 
+        detail: { projectId } 
+      }))
       return
     }
 
@@ -80,6 +88,11 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
         setTasks(initialTasks)
         throw new Error('Failed to delete task')
       }
+      
+      // Dispatch event to notify sidebar to update task counts
+      window.dispatchEvent(new CustomEvent('taskDeleted', { 
+        detail: { projectId } 
+      }))
     } catch (error) {
       // Error deleting task
     }
@@ -125,6 +138,11 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
       setTasks((prev) =>
         prev.map((task) => (task.id === tempId ? data.task : task))
       )
+      
+      // Dispatch event to notify sidebar to update task counts
+      window.dispatchEvent(new CustomEvent('taskCreated', { 
+        detail: { projectId: projectId || null } 
+      }))
     } catch (error) {
       // Error creating task
       setTasks((prev) => prev.filter((task) => task.id !== tempId))

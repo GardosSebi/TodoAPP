@@ -8,7 +8,7 @@ import AdvancedFilters from '@/components/AdvancedFilters'
 import ImportTasksModal from '@/components/ImportTasksModal'
 import { Task, Tag } from '@/types'
 import { useState, useEffect } from 'react'
-import { Upload, CheckCircle, RotateCcw } from 'lucide-react'
+import { Upload, CheckCircle, RotateCcw, Archive } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface ProjectClientProps {
@@ -32,6 +32,7 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
   const [completed, setCompleted] = useState(projectCompleted)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isReopening, setIsReopening] = useState(false)
+  const [isArchiving, setIsArchiving] = useState(false)
 
   useEffect(() => {
     fetchProjects()
@@ -167,6 +168,11 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
         const newTask = { ...data.task, status: 'NOT_STARTED' as const }
         setTasks((prev) => [newTask, ...prev])
         // Refresh filtered tasks will happen automatically via useEffect
+        
+        // Dispatch event to notify sidebar to update task counts
+        window.dispatchEvent(new CustomEvent('taskCreated', { 
+          detail: { projectId: projectId } 
+        }))
       }
     } catch (error) {
       // Error('Error creating task:', error)
@@ -223,6 +229,11 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
         setTasks(initialTasks)
         throw new Error('Failed to delete task')
       }
+      
+      // Dispatch event to notify sidebar to update task counts
+      window.dispatchEvent(new CustomEvent('taskDeleted', { 
+        detail: { projectId: projectId } 
+      }))
     } catch (error) {
       // Error('Error deleting task:', error)
     }
@@ -246,6 +257,10 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
 
       if (res.ok) {
         setCompleted(true)
+        // Dispatch event to notify sidebar to update project list (color change)
+        window.dispatchEvent(new CustomEvent('projectCompleted', { 
+          detail: { projectId: projectId } 
+        }))
         router.refresh()
       }
     } catch (error) {
@@ -268,12 +283,51 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
 
       if (res.ok) {
         setCompleted(false)
+        // Dispatch event to notify sidebar to update project list (color change)
+        window.dispatchEvent(new CustomEvent('projectReopened', { 
+          detail: { projectId: projectId } 
+        }))
         router.refresh()
       }
     } catch (error) {
       // Error handling
     } finally {
       setIsReopening(false)
+    }
+  }
+
+  const handleArchiveProject = async () => {
+    if (!completed || !isProjectOwner) {
+      return
+    }
+
+    if (!confirm('Ești sigur că vrei să arhivezi acest proiect? Proiectul va fi mutat în arhivă.')) {
+      return
+    }
+
+    setIsArchiving(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: true }),
+      })
+
+      if (res.ok) {
+        // Dispatch event to notify sidebar to update project list
+        window.dispatchEvent(new CustomEvent('projectArchived', { 
+          detail: { projectId: projectId } 
+        }))
+        // Redirect to archived page or inbox
+        router.push('/app/archived')
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Eroare la arhivarea proiectului')
+      }
+    } catch (error) {
+      alert('Eroare la arhivarea proiectului')
+    } finally {
+      setIsArchiving(false)
     }
   }
 
@@ -317,6 +371,11 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
       
       setTasks((prev) => [...newTasks, ...prev])
       
+      // Dispatch event to notify sidebar to update task counts
+      window.dispatchEvent(new CustomEvent('taskCreated', { 
+        detail: { projectId: projectId } 
+      }))
+      
       // Refresh page to get full task data
       window.location.reload()
     } catch (error: any) {
@@ -351,14 +410,24 @@ export default function ProjectClient({ initialTasks, projectId, projectName, pr
           </div>
           {completed ? (
             isProjectOwner && (
-              <button
-                onClick={handleReopenProject}
-                disabled={isReopening}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RotateCcw className="w-4 h-4" />
-                {isReopening ? 'Repornire...' : 'Repornește Proiectul'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReopenProject}
+                  disabled={isReopening}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {isReopening ? 'Repornire...' : 'Repornește Proiectul'}
+                </button>
+                <button
+                  onClick={handleArchiveProject}
+                  disabled={isArchiving}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-600 dark:bg-gray-500 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Archive className="w-4 h-4" />
+                  {isArchiving ? 'Arhivare...' : 'Arhivează Proiectul'}
+                </button>
+              </div>
             )
           ) : (
             allTasksCompleted && (

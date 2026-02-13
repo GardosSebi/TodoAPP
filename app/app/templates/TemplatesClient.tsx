@@ -169,11 +169,22 @@ export default function TemplatesClient({
       })
 
       if (res.ok) {
-        alert('Task creat cu succes!')
+        const data = await res.json()
         setCreateTaskTemplateId(null)
         setSelectedProjectId('')
-        // Optionally refresh the page or redirect
-        window.location.href = '/app'
+        
+        // Dispatch event to notify sidebar to update task counts
+        window.dispatchEvent(new CustomEvent('taskCreated', { 
+          detail: { projectId: data.task?.projectId || null } 
+        }))
+        
+        // If task was created with a project, redirect to project page
+        if (data.task?.projectId) {
+          window.location.href = `/app/project/${data.task.projectId}`
+        } else {
+          // Otherwise redirect to inbox
+          window.location.href = '/app'
+        }
       } else {
         const error = await res.json()
         alert(error.error || 'Eroare la crearea task-ului')

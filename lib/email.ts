@@ -295,7 +295,7 @@ export function createTaskCompletedEmail(
         <body>
           <div class="container">
             <div class="header">
-              <h1>✓ Sarcina finalizată</h1>
+              <h1>Sarcina finalizată</h1>
             </div>
             <div class="content">
               <p>Salut ${recipientName},</p>
