@@ -1,199 +1,239 @@
-# Todo App
+# Deployment Demo - Production-like CI/CD System
 
-A modern, responsive web-based to-do application built with Next.js 15, TypeScript, PostgreSQL, and Prisma.
+A complete deployment system demonstrating infrastructure-as-code, containerization, and automated CI/CD pipelines. This project deploys a simple FastAPI application to AWS EC2 using Terraform, Docker Compose, Nginx, and GitHub Actions.
 
-## Features
+## Architecture
 
-- ✅ User authentication with email/password (NextAuth.js + Argon2)
-- ✅ Task CRUD operations with optimistic UI updates
-- ✅ Project organization (custom lists)
-- ✅ Task metadata: due dates, priority levels, markdown notes
-- ✅ Filtering views: Inbox, Today, Upcoming, Completed
-- ✅ Mobile-first responsive design
-- ✅ Smooth animations with Framer Motion
-- ✅ Secure data isolation (users can only see their own tasks)
+```
+User Request → Nginx (Port 80) → FastAPI App (Port 8000) → Response
+```
 
-## Tech Stack
+**Infrastructure:**
+- AWS EC2 instance (Ubuntu 22.04)
+- Security Group (HTTP + SSH)
+- Optional Elastic IP
+- Docker & Docker Compose installed via user_data
 
-- **Framework**: Next.js 15.0.7 (App Router)
-- **Language**: TypeScript 5.3.3
-- **Database**: PostgreSQL 15
-- **ORM**: Prisma 5.8.1
-- **Auth**: NextAuth.js 4.24.5
-- **Styling**: Tailwind CSS 3.4.4 + Styled Components 6.1.13
-- **UI**: Framer Motion 12.23.24, Headless UI 2.2.9
-- **Icons**: Lucide React, Heroicons 2.2.0
+**Application Stack:**
+- FastAPI application container
+- Nginx reverse proxy container
+- Health check endpoints for deployment verification
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js v14 or higher
-- Docker (for PostgreSQL)
-- npm or yarn
-
-### Installation
-
-1. **Clone the repository** (or navigate to the project directory)
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**:
-   Create a `.env` file in the root directory:
-   ```env
-   DATABASE_URL="postgresql://user:password@localhost:5432/todoapp?schema=public"
-   NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="your-secret-key-here-change-in-production"
-   ```
-
-   Generate a secure `NEXTAUTH_SECRET`:
-   ```bash
-   openssl rand -base64 32
-   ```
-
-4. **Start PostgreSQL with Docker**:
-   ```bash
-   docker-compose up -d
-   ```
-
-5. **Set up the database**:
-   ```bash
-   # Generate Prisma Client
-   npm run db:generate
-
-   # Push schema to database
-   npm run db:push
-
-   # Or run migrations
-   npm run db:migrate
-   ```
-
-6. **Run the development server**:
-   ```bash
-   npm run dev
-   ```
-
-7. **Open your browser**:
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## Usage
-
-1. **Register a new account** at `/register`
-2. **Sign in** at `/login`
-3. **Create tasks** using the quick add input
-4. **Organize tasks** into projects (custom lists)
-5. **Filter tasks** by views:
-   - **Inbox**: All active tasks
-   - **Today**: Tasks due today
-   - **Upcoming**: Tasks due in the future
-   - **Completed**: Completed tasks
-6. **Edit tasks** by clicking on them to open the details modal
-7. **Set priorities** and due dates for better organization
+**CI/CD:**
+- GitHub Actions CI: Lint, test, build
+- GitHub Actions CD: SSH deployment with health checks
 
 ## Project Structure
 
 ```
-├── app/
-│   ├── api/              # API routes
-│   │   ├── auth/         # Authentication endpoints
-│   │   ├── tasks/        # Task CRUD operations
-│   │   └── projects/     # Project CRUD operations
-│   ├── app/              # Protected app routes
-│   │   ├── today/        # Today view
-│   │   ├── upcoming/     # Upcoming view
-│   │   ├── completed/    # Completed view
-│   │   └── project/      # Project-specific views
-│   ├── login/            # Login page
-│   └── register/         # Registration page
-├── components/           # React components
-│   ├── Sidebar.tsx       # Navigation sidebar
-│   ├── TaskList.tsx      # Task list with optimistic updates
-│   ├── TaskItem.tsx      # Individual task item
-│   ├── TaskDetailsModal.tsx  # Task editing modal
-│   └── QuickAddTask.tsx  # Quick task creation input
-├── lib/                  # Utility functions
-│   ├── prisma.ts         # Prisma client instance
-│   ├── auth.ts           # NextAuth configuration
-│   └── utils.ts          # Helper functions
-├── prisma/
-│   └── schema.prisma     # Database schema
-└── types/                # TypeScript type definitions
+.
+├── app/                    # FastAPI application
+│   ├── src/
+│   │   └── main.py        # Application code
+│   ├── Dockerfile         # Container definition
+│   ├── requirements.txt   # Python dependencies
+│   └── test_main.py       # Unit tests
+├── deploy/                # Deployment configuration
+│   ├── docker-compose.yml # Container orchestration
+│   └── nginx.conf         # Nginx configuration
+├── infra/                 # Terraform infrastructure
+│   ├── main.tf            # Main resources
+│   ├── variables.tf       # Variable definitions
+│   ├── outputs.tf         # Output values
+│   ├── user_data.sh       # EC2 bootstrap script
+│   ├── dev.tfvars         # Dev environment config
+│   └── prod.tfvars        # Prod environment config
+└── .github/workflows/     # CI/CD pipelines
+    ├── ci.yml             # Continuous Integration
+    └── deploy.yml         # Continuous Deployment
 ```
 
-## Database Schema
+## Quick Start
 
-### User
-- `id`: UUID (Primary Key)
-- `email`: String (Unique, Indexed)
-- `password_hash`: String (Argon2)
-- `created_at`, `updated_at`: Timestamps
+### 1. Infrastructure Setup
 
-### Project
-- `id`: UUID (Primary Key)
-- `userId`: Foreign Key → User.id
-- `name`: String (1-60 characters)
-- `color`: String (Hex color, Optional)
-- `created_at`, `updated_at`: Timestamps
-
-### Task
-- `id`: UUID (Primary Key)
-- `userId`: Foreign Key → User.id
-- `projectId`: Foreign Key → Project.id (Nullable)
-- `title`: String (1-120 characters)
-- `notes`: Text (Optional)
-- `due_at`: Timestamp (Nullable, Indexed)
-- `priority`: Integer (0=none, 1=low, 2=med, 3=high)
-- `status`: Enum (ACTIVE, COMPLETED)
-- `completed_at`: Timestamp (Nullable)
-- `created_at`, `updated_at`: Timestamps
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/[...nextauth]` - NextAuth endpoints
-
-### Tasks
-- `GET /api/tasks` - Get tasks (supports `?status=`, `?projectId=`, `?view=`)
-- `POST /api/tasks` - Create task
-- `GET /api/tasks/[id]` - Get task by ID
-- `PATCH /api/tasks/[id]` - Update task
-- `DELETE /api/tasks/[id]` - Delete task
-
-### Projects
-- `GET /api/projects` - Get all projects
-- `POST /api/projects` - Create project
-- `PATCH /api/projects/[id]` - Update project
-- `DELETE /api/projects/[id]` - Delete project
-
-## Security
-
-- All API routes are protected and scoped by `userId`
-- Passwords are hashed using Argon2
-- JWT-based session management
-- Input validation on all endpoints
-- SQL injection protection via Prisma
-
-## Development
-
-### Database Commands
 ```bash
-npm run db:generate  # Generate Prisma Client
-npm run db:push      # Push schema changes
-npm run db:migrate   # Create migration
-npm run db:studio    # Open Prisma Studio
+cd infra
+
+# Copy and edit terraform variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+
+# Initialize Terraform
+terraform init
+
+# Plan infrastructure
+terraform plan -var-file=dev.tfvars
+
+# Apply infrastructure
+terraform apply -var-file=dev.tfvars
+
+# Save outputs
+terraform output -json > outputs.json
 ```
 
-### Build for Production
+**Important outputs:**
+- `ssh_command`: SSH command to connect
+- `app_url`: Application URL
+- `ssh_private_key_path`: Path to SSH private key
+
+### 2. Configure GitHub Secrets
+
+Go to your GitHub repository → Settings → Secrets and variables → Actions, and add:
+
+- `SSH_PRIVATE_KEY`: Contents of the `.pem` file from Terraform output
+- `EC2_HOST`: Public IP or Elastic IP of your EC2 instance
+- `EC2_USER`: `ubuntu` (default for Ubuntu AMI)
+- `APP_URL`: `http://<your-ec2-ip>` (optional, for external health checks)
+
+### 3. Deploy Application
+
+The deployment happens automatically on push to `main` branch, or manually via:
+
 ```bash
-npm run build
-npm start
+# Push to main branch
+git push origin main
+
+# Or trigger manually via GitHub Actions UI
 ```
+
+### 4. Verify Deployment
+
+```bash
+# Check health endpoint
+curl http://<your-ec2-ip>/health
+
+# Check version endpoint
+curl http://<your-ec2-ip>/version
+
+# Check root endpoint
+curl http://<your-ec2-ip>/
+```
+
+## Application Endpoints
+
+- `GET /` - Root endpoint with app info
+- `GET /health` - Health check endpoint (returns `{"status": "ok"}`)
+- `GET /version` - Version endpoint (returns git SHA)
+
+## Infrastructure Details
+
+### EC2 Instance
+- **AMI**: Ubuntu 22.04 LTS (auto-detected)
+- **Instance Type**: t3.micro (dev) / t3.small (prod)
+- **Storage**: 20GB (dev) / 30GB (prod) encrypted GP3
+- **Bootstrap**: Installs Docker, Docker Compose, Git via user_data
+
+### Security Group
+- **Port 80**: HTTP (open to world)
+- **Port 22**: SSH (configurable CIDR blocks)
+
+### Docker Compose Services
+- **app**: FastAPI application on port 8000
+- **nginx**: Reverse proxy on port 80
+- **Network**: Bridge network connecting both containers
+
+## CI/CD Pipeline
+
+### CI Workflow (`ci.yml`)
+Triggers on:
+- Pull requests to `main`
+- Pushes to `main`
+
+Steps:
+1. Checkout code
+2. Set up Python environment
+3. Install dependencies
+4. Lint with flake8
+5. Format check with black
+6. Run tests with pytest
+7. Build Docker image
+8. Test Docker image
+
+### CD Workflow (`deploy.yml`)
+Triggers on:
+- Push to `main` branch
+- Manual workflow dispatch
+
+Steps:
+1. Checkout code
+2. Get git SHA
+3. Configure SSH
+4. Copy files to server
+5. Deploy via Docker Compose
+6. Health check (internal)
+7. Verify deployment (external, if APP_URL set)
+
+## Manual Deploymenthttp://localhost:8000/version
+# Check logs
+docker compose logs -f
+
+# Health check
+curl http://localhost/health
+```
+
+## Troubleshooting
+
+### Health Check Fails
+```bash
+# SSH into server
+ssh -i infra/deployment-demo-dev.pem ubuntu@<ec2-ip>
+
+# Check container status
+docker compose -f /opt/app/deploy/docker-compose.yml ps
+
+# Check logs
+docker compose -f /opt/app/deploy/docker-compose.yml logs
+
+# Restart containers
+cd /opt/app/deploy
+docker compose restart
+```
+
+### SSH Connection Issues
+```bash
+# Verify security group allows SSH from your IP
+# Check key permissions
+chmod 400 infra/deployment-demo-dev.pem
+
+# Test connection
+ssh -i infra/deployment-demo-dev.pem ubuntu@<ec2-ip>
+```
+
+## Security Considerations
+
+⚠️ **Important Security Notes:**
+
+1. **SSH Access**: Restrict `ssh_allowed_cidrs` in production to your IP or VPN CIDR
+2. **Private Keys**: Never commit `.pem` files or `terraform.tfvars` to git
+3. **GitHub Secrets**: Use GitHub Secrets for all sensitive values
+4. **Security Groups**: Review and restrict security group rules for production
+5. **HTTPS**: Add SSL/TLS certificate (Let's Encrypt) for production
+
+## Cost Estimation
+
+**Development Environment (t3.micro):**
+- EC2: ~$7-10/month (depending on usage)
+- Data Transfer: Minimal for demo
+- Elastic IP: Free if attached to running instance
+
+**Production Environment (t3.small + Elastic IP):**
+- EC2: ~$15-20/month
+- Elastic IP: Free if attached
+
+## Requirements Met
+
+- ✅ Terraform creates EC2 and security group
+- ✅ Dockerized app
+- ✅ Nginx reverse proxy
+- ✅ GitHub Actions CI
+- ✅ GitHub Actions deploy over SSH
+- ✅ Health check endpoint
+- ✅ Version endpoint with git SHA
+- ✅ Server bootstrapping via user_data
+- ✅ Docker Compose orchestration
+- ✅ Environment-specific configs (dev/prod)
 
 ## License
 
-MIT
-
+This is a demonstration project for learning purposes.

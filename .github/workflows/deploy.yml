@@ -1,0 +1,108 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  APP_DIR: /opt/app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get git SHA
+        id: git
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy files to server
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          scp -i $SSH_KEY -r ./app $EC2_USER@$EC2_HOST:$APP_DIR/
+          scp -i $SSH_KEY -r ./deploy $EC2_USER@$EC2_HOST:$APP_DIR/
+
+      - name: Deploy application
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          GIT_SHA: ${{ steps.git.outputs.sha }}
+        run: |
+          ssh -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
+            set -e
+            export GIT_SHA=$GIT_SHA
+            cd /opt/app/deploy
+            docker compose down || true
+            docker compose build --no-cache
+            GIT_SHA=$GIT_SHA docker compose up -d
+            echo 'Waiting for containers to be healthy...'
+            sleep 10
+          "
+
+      - name: Health check
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          echo "Waiting for application to be ready..."
+          sleep 5
+          
+          # Health check via SSH
+          ssh -i $SSH_KEY $EC2_USER@$EC2_HOST bash -c "
+            max_attempts=30
+            attempt=0
+            while [ \$attempt -lt \$max_attempts ]; do
+              if curl -f http://localhost/health > /dev/null 2>&1; then
+                echo 'Health check passed!'
+                curl http://localhost/health
+                curl http://localhost/version
+                exit 0
+              fi
+              attempt=\$((attempt + 1))
+              echo \"Health check attempt \$attempt/\$max_attempts failed, retrying...\"
+              sleep 2
+            done
+            echo \"Health check failed after \$max_attempts attempts\"
+            docker compose -f /opt/app/deploy/docker-compose.yml logs
+            exit 1
+          "
+
+      - name: Verify deployment
+        run: |
+          APP_URL="${{ secrets.APP_URL }}"
+          if [ -z "$APP_URL" ]; then
+            echo "APP_URL secret not set, skipping external verification"
+            exit 0
+          fi
+          
+          echo "Verifying deployment at $APP_URL"
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL/health" || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Deployment verified successfully!"
+            curl -s "$APP_URL/health" | jq . || curl -s "$APP_URL/health"
+            curl -s "$APP_URL/version" | jq . || curl -s "$APP_URL/version"
+          else
+            echo "❌ Deployment verification failed. HTTP status: $response"
+            exit 1
+          fi
+
