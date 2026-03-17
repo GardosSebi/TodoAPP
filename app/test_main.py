@@ -1,6 +1,7 @@
 """
 Simple tests for the FastAPI application.
 """
+
 from fastapi.testclient import TestClient
 from src.main import app
 
@@ -34,4 +35,3 @@ def test_version():
     assert "version" in data
     assert "git_sha" in data
     assert "timestamp" in data
-
