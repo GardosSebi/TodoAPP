@@ -35,17 +35,27 @@ User Request → Nginx (Port 80) → FastAPI App (Port 8000) → Response
 │   └── test_main.py       # Unit tests
 ├── deploy/                # Deployment configuration
 │   ├── docker-compose.yml # Container orchestration
-│   └── nginx.conf         # Nginx configuration
+│   ├── nginx.conf         # Nginx configuration
+│   └── .env.example       # Example env vars (GIT_SHA, APP_ENV)
+├── docs/                  # Documentation
+│   ├── DEV-PROD-CONFIGS.md # Dev/prod Terraform and GitHub Environments
+│   ├── HTTPS-setup.md     # Let's Encrypt and ACM/ALB options
+│   ├── MONITORING.md      # CloudWatch agent
+│   └── SECRETS.md         # GitHub Actions secrets reference
 ├── infra/                 # Terraform infrastructure
-│   ├── main.tf            # Main resources
+│   ├── main.tf            # Main resources (EC2, IAM, security group)
 │   ├── variables.tf       # Variable definitions
 │   ├── outputs.tf         # Output values
-│   ├── user_data.sh       # EC2 bootstrap script
+│   ├── user_data.sh       # EC2 bootstrap (Docker, optional CloudWatch)
+│   ├── cloudwatch-agent-config.json # CloudWatch logs/metrics
 │   ├── dev.tfvars         # Dev environment config
 │   └── prod.tfvars        # Prod environment config
+├── scripts/
+│   └── rollback.sh        # Local rollback script (deploy a specific SHA)
 └── .github/workflows/     # CI/CD pipelines
-    ├── ci.yml             # Continuous Integration
-    └── deploy.yml         # Continuous Deployment
+    ├── ci.yml             # Continuous Integration (lint, test, build)
+    ├── deploy.yml         # Continuous Deployment (runs after CI passes)
+    └── rollback.yml       # Rollback workflow (deploy a given commit SHA)
 ```
 
 ## Quick Start
@@ -122,7 +132,8 @@ curl http://<your-ec2-ip>/
 - **AMI**: Ubuntu 22.04 LTS (auto-detected)
 - **Instance Type**: t3.micro (dev) / t3.small (prod)
 - **Storage**: 20GB (dev) / 30GB (prod) encrypted GP3
-- **Bootstrap**: Installs Docker, Docker Compose, Git via user_data
+- **IAM**: Instance profile with CloudWatchAgentServerPolicy (for optional monitoring)
+- **Bootstrap**: Installs Docker, Docker Compose, Git; optionally CloudWatch agent (logs + basic metrics)
 
 ### Security Group
 - **Port 80**: HTTP (open to world)
@@ -152,11 +163,11 @@ Steps:
 
 ### CD Workflow (`deploy.yml`)
 Triggers on:
-- Push to `main` branch
+- **After CI completes successfully** on `main` (deploy only when tests pass)
 - Manual workflow dispatch
 
 Steps:
-1. Checkout code
+1. Checkout code (at the commit that passed CI)
 2. Get git SHA
 3. Configure SSH
 4. Copy files to server
@@ -164,11 +175,16 @@ Steps:
 6. Health check (internal)
 7. Verify deployment (external, if APP_URL set)
 
-## Manual Deploymenthttp://localhost:8000/version
-# Check logs
-docker compose logs -f
+### Rollback Workflow (`rollback.yml`)
+- **Manual only:** Actions → Rollback → Run workflow → enter a git SHA.
+- Deploys that commit to the server (same steps as deploy). Use after a bad release.
 
-# Health check
+## Manual Deployment (on server)
+
+```bash
+# SSH into server, then:
+cd /opt/app/deploy
+docker compose logs -f
 curl http://localhost/health
 ```
 
@@ -233,6 +249,15 @@ ssh -i infra/deployment-demo-dev.pem ubuntu@<ec2-ip>
 - ✅ Server bootstrapping via user_data
 - ✅ Docker Compose orchestration
 - ✅ Environment-specific configs (dev/prod)
+
+## Nice-to-have (included)
+
+- ✅ **Rollback:** `scripts/rollback.sh` (local) and **Actions → Rollback** workflow (enter git SHA to deploy that commit).
+- ✅ **Separate dev/prod:** Terraform `dev.tfvars` / `prod.tfvars`; see [docs/DEV-PROD-CONFIGS.md](docs/DEV-PROD-CONFIGS.md) for GitHub Environments.
+- ✅ **HTTPS:** See [docs/HTTPS-setup.md](docs/HTTPS-setup.md) (Let's Encrypt on EC2 or ACM + ALB later).
+- ✅ **GitHub Actions secrets:** SSH key and host in repo (or environment) secrets; see [docs/SECRETS.md](docs/SECRETS.md).
+- ✅ **Deploy only after tests pass:** Deploy workflow runs only when the CI workflow completes successfully on `main` (or when run manually).
+- ✅ **Basic monitoring:** CloudWatch agent (optional, default on) — syslog, user-data log, CPU/memory/disk metrics; see [docs/MONITORING.md](docs/MONITORING.md). Set `enable_cloudwatch_agent = false` in tfvars to disable.
 
 ## License
 

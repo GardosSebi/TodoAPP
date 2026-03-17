@@ -21,6 +21,37 @@ provider "aws" {
   region = var.aws_region
 }
 
+# IAM role for EC2 (CloudWatch agent, optional SSM)
+data "aws_iam_policy_document" "ec2_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "app_server" {
+  name               = "${var.project_name}-role-${var.environment}"
+  assume_role_policy  = data.aws_iam_policy_document.ec2_assume.json
+  tags = {
+    Name        = "${var.project_name}-role-${var.environment}"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  role       = aws_iam_role.app_server.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_instance_profile" "app_server" {
+  name = "${var.project_name}-profile-${var.environment}"
+  role = aws_iam_role.app_server.name
+}
+
 # Get default VPC
 data "aws_vpc" "default" {
   default = true
@@ -128,14 +159,17 @@ resource "local_file" "private_key" {
 
 # EC2 Instance
 resource "aws_instance" "app_server" {
-  ami = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu[0].id
+  ami                    = var.ami_id != "" ? var.ami_id : data.aws_ami.ubuntu[0].id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.app_key.key_name
   vpc_security_group_ids = [aws_security_group.app_sg.id]
-  
+  iam_instance_profile   = aws_iam_instance_profile.app_server.name
+
   user_data = templatefile("${path.module}/user_data.sh", {
-    git_repo_url = var.git_repo_url
-    git_branch   = var.git_branch
+    git_repo_url          = var.git_repo_url
+    git_branch            = var.git_branch
+    cloudwatch_config_b64 = var.enable_cloudwatch_agent ? base64encode(file("${path.module}/cloudwatch-agent-config.json")) : ""
+    enable_cloudwatch     = var.enable_cloudwatch_agent
   })
 
   root_block_device {

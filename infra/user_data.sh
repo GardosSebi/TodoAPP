@@ -56,6 +56,17 @@ EOF
 chmod +x /opt/app/start.sh
 chown ubuntu:ubuntu /opt/app/start.sh
 
+# Optional: CloudWatch agent (basic monitoring)
+if [ "${enable_cloudwatch}" = "true" ] && [ -n "${cloudwatch_config_b64}" ]; then
+  CW_DEB="https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
+  wget -q "$CW_DEB" -O /tmp/amazon-cloudwatch-agent.deb
+  dpkg -i -E /tmp/amazon-cloudwatch-agent.deb
+  rm -f /tmp/amazon-cloudwatch-agent.deb
+  mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+  echo "${cloudwatch_config_b64}" | base64 -d > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+fi
+
 # Log completion
 echo "Bootstrap completed at $(date)" >> /var/log/user-data.log
 

@@ -61,3 +61,9 @@ variable "git_branch" {
   default     = "main"
 }
 
+variable "enable_cloudwatch_agent" {
+  description = "Install and run CloudWatch agent for basic logs and metrics"
+  type        = bool
+  default     = true
+}
+
