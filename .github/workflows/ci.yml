@@ -67,6 +67,7 @@ jobs:
           context: ./app
           file: ./app/Dockerfile
           push: false
+          load: true
           tags: deployment-demo-app:${{ steps.git.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
