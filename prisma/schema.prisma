@@ -23,29 +23,68 @@ enum UserRole {
   USER
 }
 
+enum ContactStatus {
+  LEAD
+  PROSPECT
+  CUSTOMER
+  PARTNER
+  INACTIVE
+}
+
+enum CompanyStatus {
+  LEAD
+  ACTIVE_CUSTOMER
+  PAST_CUSTOMER
+  PARTNER
+  INACTIVE
+}
+
+enum DealStage {
+  NEW
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum TaskType {
+  CALL
+  EMAIL
+  MEETING
+  FOLLOW_UP
+  PROPOSAL
+  ADMIN
+  OTHER
+}
+
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  name         String
-  password_hash String
-  role         UserRole  @default(USER)
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  workspaceId  String    @unique
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  projects     Project[]
-  tasks        Task[]
-  teamMembers  TeamMember[] @relation("TeamMember")
-  admin        TeamMember[] @relation("Admin")
-  sharedProjects ProjectMember[]
-  workspaceMemberships WorkspaceMember[] @relation("WorkspaceMember")
-  workspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitation")
+  id                       String                @id @default(uuid())
+  email                    String                @unique
+  name                     String
+  password_hash            String
+  role                     UserRole              @default(USER)
+  created_at               DateTime              @default(now())
+  updated_at               DateTime              @updatedAt
+  workspaceId              String                @unique
+  workspace                Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects                 Project[]
+  tasks                    Task[]
+  teamMembers              TeamMember[]          @relation("TeamMember")
+  admin                    TeamMember[]          @relation("Admin")
+  sharedProjects           ProjectMember[]
+  workspaceMemberships     WorkspaceMember[]     @relation("WorkspaceMember")
+  workspaceInvitations     WorkspaceInvitation[] @relation("WorkspaceInvitation")
   sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInviter")
-  comments     Comment[]
-  activities   Activity[]
-  filterPresets FilterPreset[]
-  notifications Notification[]
-  taskTemplates TaskTemplate[]
+  comments                 Comment[]
+  activities               Activity[]
+  filterPresets            FilterPreset[]
+  notifications            Notification[]
+  taskTemplates            TaskTemplate[]
+  createdContacts          Contact[]
+  ownedDeals               Deal[]
+  crmNotes                 CRMNote[]
+  interactions             Interaction[]
 
   @@index([email])
   @@index([role])
@@ -53,32 +92,37 @@ model User {
 }
 
 model Workspace {
-  id         String   @id @default(uuid())
-  name       String
-  userId     String?  @unique
-  user       User?
-  projects   Project[]
-  tasks      Task[]
-  members    WorkspaceMember[]
-  invitations WorkspaceInvitation[]
-  activities Activity[]
-  tags       Tag[]
+  id            String                @id @default(uuid())
+  name          String
+  userId        String?               @unique
+  user          User?
+  projects      Project[]
+  tasks         Task[]
+  members       WorkspaceMember[]
+  invitations   WorkspaceInvitation[]
+  activities    Activity[]
+  tags          Tag[]
   taskTemplates TaskTemplate[]
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  contacts      Contact[]
+  companies     Company[]
+  deals         Deal[]
+  crmNotes      CRMNote[]
+  interactions  Interaction[]
+  created_at    DateTime              @default(now())
+  updated_at    DateTime              @updatedAt
 
   @@index([userId])
 }
 
 model WorkspaceMember {
-  id         String   @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
-  userId     String
-  role       String   @default("MEMBER") // OWNER, MEMBER
-  invited_by String?
-  created_at DateTime @default(now())
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user       User     @relation("WorkspaceMember", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  role        String    @default("MEMBER") // OWNER, MEMBER
+  invited_by  String?
+  created_at  DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation("WorkspaceMember", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([workspaceId])
@@ -86,16 +130,16 @@ model WorkspaceMember {
 }
 
 model WorkspaceInvitation {
-  id         String   @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
-  userId     String
-  invited_by String
-  status     String   @default("PENDING") // PENDING, ACCEPTED, DENIED
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user       User     @relation("WorkspaceInvitation", fields: [userId], references: [id], onDelete: Cascade)
-  inviter    User     @relation("WorkspaceInviter", fields: [invited_by], references: [id], onDelete: Cascade)
+  userId      String
+  invited_by  String
+  status      String    @default("PENDING") // PENDING, ACCEPTED, DENIED
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation("WorkspaceInvitation", fields: [userId], references: [id], onDelete: Cascade)
+  inviter     User      @relation("WorkspaceInviter", fields: [invited_by], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([workspaceId])
@@ -104,20 +148,20 @@ model WorkspaceInvitation {
 }
 
 model Project {
-  id         String   @id @default(uuid())
-  userId     String
+  id          String          @id @default(uuid())
+  userId      String
   workspaceId String
-  name       String   @db.VarChar(60)
-  color      String?
-  archived   Boolean  @default(false)
-  completed  Boolean  @default(false)
-  order      Int      @default(0) // For custom ordering in sidebar
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tasks      Task[]
-  members    ProjectMember[]
+  name        String          @db.VarChar(60)
+  color       String?
+  archived    Boolean         @default(false)
+  completed   Boolean         @default(false)
+  order       Int             @default(0) // For custom ordering in sidebar
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  members     ProjectMember[]
 
   @@index([userId])
   @@index([workspaceId])
@@ -127,12 +171,12 @@ model Project {
 }
 
 model TeamMember {
-  id        String   @id @default(uuid())
-  adminId   String
-  userId    String
+  id         String   @id @default(uuid())
+  adminId    String
+  userId     String
   created_at DateTime @default(now())
-  admin     User     @relation("Admin", fields: [adminId], references: [id], onDelete: Cascade)
-  user      User     @relation("TeamMember", fields: [userId], references: [id], onDelete: Cascade)
+  admin      User     @relation("Admin", fields: [adminId], references: [id], onDelete: Cascade)
+  user       User     @relation("TeamMember", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([adminId, userId])
   @@index([adminId])
@@ -140,12 +184,12 @@ model TeamMember {
 }
 
 model ProjectMember {
-  id        String   @id @default(uuid())
-  projectId String
-  userId    String
+  id         String   @id @default(uuid())
+  projectId  String
+  userId     String
   created_at DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([projectId])
@@ -153,36 +197,195 @@ model ProjectMember {
 }
 
 model Task {
-  id           String     @id @default(uuid())
+  id           String        @id @default(uuid())
   userId       String
   workspaceId  String
   projectId    String?
-  title        String     @db.VarChar(120)
-  notes        String?    @db.Text
+  title        String        @db.VarChar(120)
+  notes        String?       @db.Text
   due_at       DateTime?
-  priority     Int        @default(0) // 0=none, 1=low, 2=med, 3=high
-  status       TaskStatus @default(ACTIVE)
+  reminder_at  DateTime?
+  priority     Int           @default(0) // 0=none, 1=low, 2=med, 3=high
+  status       TaskStatus    @default(ACTIVE)
+  task_type    TaskType?
   completed_at DateTime?
-  responsible  String?    @db.VarChar(100)
-  archived     Boolean    @default(false)
-  created_at   DateTime   @default(now())
-  updated_at   DateTime   @updatedAt
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project      Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  responsible  String?       @db.VarChar(100)
+  contactId    String?
+  companyId    String?
+  dealId       String?
+  archived     Boolean       @default(false)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   files        TaskFile[]
   subtasks     SubTask[]
   comments     Comment[]
   activities   Activity[]
   tags         TaskTag[]
+  crmNotes     CRMNote[]
+  interactions Interaction[]
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  deal         Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([workspaceId])
   @@index([projectId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
   @@index([due_at])
+  @@index([reminder_at])
   @@index([status])
+  @@index([task_type])
   @@index([title])
   @@index([archived])
+}
+
+model Company {
+  id               String        @id @default(uuid())
+  workspaceId      String
+  name             String        @db.VarChar(120)
+  website          String?       @db.VarChar(255)
+  industry         String?       @db.VarChar(100)
+  size             String?       @db.VarChar(50)
+  location         String?       @db.VarChar(120)
+  status           CompanyStatus @default(LEAD)
+  notes            String?       @db.Text
+  primaryContactId String?
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contacts         Contact[]
+  deals            Deal[]
+  tasks            Task[]
+  primaryContact   Contact?      @relation("CompanyPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  crmNotes         CRMNote[]
+  interactions     Interaction[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([status])
+  @@index([name])
+  @@index([primaryContactId])
+}
+
+model Contact {
+  id                String        @id @default(uuid())
+  workspaceId       String
+  companyId         String?
+  first_name        String        @db.VarChar(80)
+  last_name         String        @db.VarChar(80)
+  email             String?       @db.VarChar(255)
+  phone             String?       @db.VarChar(40)
+  job_title         String?       @db.VarChar(100)
+  status            ContactStatus @default(LEAD)
+  tags              String[] // simple tags for CRM filters
+  notes             String?       @db.Text
+  created_by        String?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  company           Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  tasks             Task[]
+  deals             Deal[]
+  crmNotes          CRMNote[]
+  interactions      Interaction[]
+  createdBy         User?         @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  primaryForCompany Company[]     @relation("CompanyPrimaryContact")
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@index([companyId])
+  @@index([status])
+  @@index([last_name])
+}
+
+model Deal {
+  id             String        @id @default(uuid())
+  workspaceId    String
+  companyId      String?
+  contactId      String?
+  title          String        @db.VarChar(140)
+  description    String?       @db.Text
+  stage          DealStage     @default(NEW)
+  value          Float         @default(0)
+  expected_close DateTime?
+  ownerId        String?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  owner          User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  tasks          Task[]
+  crmNotes       CRMNote[]
+  interactions   Interaction[]
+
+  @@index([workspaceId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([stage])
+  @@index([expected_close])
+  @@index([ownerId])
+}
+
+model CRMNote {
+  id          String    @id @default(uuid())
+  workspaceId String
+  authorId    String
+  content     String    @db.Text
+  contactId   String?
+  companyId   String?
+  dealId      String?
+  taskId      String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deal        Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([authorId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([taskId])
+}
+
+model Interaction {
+  id          String    @id @default(uuid())
+  workspaceId String
+  authorId    String
+  type        String    @db.VarChar(40) // CALL, EMAIL, MEETING, FOLLOW_UP, OTHER
+  subject     String?   @db.VarChar(140)
+  content     String?   @db.Text
+  happened_at DateTime  @default(now())
+  contactId   String?
+  companyId   String?
+  dealId      String?
+  taskId      String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deal        Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([authorId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([dealId])
+  @@index([taskId])
+  @@index([happened_at])
 }
 
 model TaskFile {
@@ -190,7 +393,7 @@ model TaskFile {
   taskId      String
   fileName    String
   filePath    String
-  fileSize    Int      // in bytes
+  fileSize    Int // in bytes
   mimeType    String
   uploaded_at DateTime @default(now())
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -199,30 +402,30 @@ model TaskFile {
 }
 
 model SubTask {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   taskId       String
-  title        String   @db.VarChar(200)
-  completed    Boolean  @default(false)
-  order        Int      @default(0) // For ordering subtasks
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  title        String    @db.VarChar(200)
+  completed    Boolean   @default(false)
+  order        Int       @default(0) // For ordering subtasks
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
   completed_at DateTime?
-  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([completed])
 }
 
 model Comment {
-  id          String   @id @default(uuid())
-  taskId      String
-  userId      String
-  content     String   @db.Text
-  mentions    String[] // Array of user IDs mentioned in comment (@db.Text array)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  taskId     String
+  userId     String
+  content    String   @db.Text
+  mentions   String[] // Array of user IDs mentioned in comment (@db.Text array)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([userId])
@@ -230,18 +433,18 @@ model Comment {
 }
 
 model Activity {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   taskId      String?
   projectId   String?
   workspaceId String
   userId      String
-  type        String   // TASK_CREATED, TASK_UPDATED, TASK_COMPLETED, COMMENT_ADDED, etc.
-  description String   @db.Text
-  metadata    String?  @db.Text // JSON string for additional data
-  created_at  DateTime @default(now())
-  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type        String // TASK_CREATED, TASK_UPDATED, TASK_COMPLETED, COMMENT_ADDED, etc.
+  description String    @db.Text
+  metadata    String?   @db.Text // JSON string for additional data
+  created_at  DateTime  @default(now())
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
   @@index([taskId])
@@ -252,27 +455,27 @@ model Activity {
 }
 
 model FilterPreset {
-  id          String   @id @default(uuid())
-  userId      String
-  name        String   @db.VarChar(100)
-  filters     String   @db.Text // JSON string with filter configuration
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  userId     String
+  name       String   @db.VarChar(100)
+  filters    String   @db.Text // JSON string with filter configuration
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Notification {
-  id          String   @id @default(uuid())
-  userId      String
-  type        String   // MENTION, COMMENT, TASK_ASSIGNED, etc.
-  title       String   @db.VarChar(200)
-  message     String   @db.Text
-  link        String?  // URL to related resource
-  read        Boolean  @default(false)
-  created_at  DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  userId     String
+  type       String // MENTION, COMMENT, TASK_ASSIGNED, etc.
+  title      String   @db.VarChar(200)
+  message    String   @db.Text
+  link       String? // URL to related resource
+  read       Boolean  @default(false)
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([read])
@@ -280,12 +483,12 @@ model Notification {
 }
 
 model Tag {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   workspaceId String
-  name        String   @db.VarChar(50)
-  color       String   @default("#3b82f6") // Hex color code
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  name        String    @db.VarChar(50)
+  color       String    @default("#3b82f6") // Hex color code
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       TaskTag[]
 
@@ -295,12 +498,12 @@ model Tag {
 }
 
 model TaskTag {
-  id        String   @id @default(uuid())
-  taskId   String
-  tagId    String
+  id         String   @id @default(uuid())
+  taskId     String
+  tagId      String
   created_at DateTime @default(now())
-  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, tagId])
   @@index([taskId])
@@ -308,24 +511,23 @@ model TaskTag {
 }
 
 model TaskTemplate {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
   workspaceId String
-  name        String   @db.VarChar(100)
-  description String?  @db.Text
-  title       String   @db.VarChar(120)
-  notes       String?  @db.Text
-  priority    Int      @default(0) // 0=none, 1=low, 2=med, 3=high
-  responsible String?  @db.VarChar(100)
-  subtasks    String   @db.Text // JSON array of subtask titles
-  tagIds      String   @db.Text // JSON array of tag IDs
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  title       String    @db.VarChar(120)
+  notes       String?   @db.Text
+  priority    Int       @default(0) // 0=none, 1=low, 2=med, 3=high
+  responsible String?   @db.VarChar(100)
+  subtasks    String    @db.Text // JSON array of subtask titles
+  tagIds      String    @db.Text // JSON array of tag IDs
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([workspaceId])
   @@index([name])
 }
-

@@ -9,9 +9,14 @@ const taskSchema = z.object({
   title: z.string().trim().min(1).max(120),
   notes: z.string().optional().nullable(),
   due_at: z.string().datetime().optional().nullable(),
+  reminder_at: z.string().datetime().optional().nullable(),
   priority: z.number().int().min(0).max(3),
   projectId: z.string().uuid().optional().nullable(),
   responsible: z.string().max(100).optional().nullable(),
+  contactId: z.string().uuid().optional().nullable(),
+  companyId: z.string().uuid().optional().nullable(),
+  dealId: z.string().uuid().optional().nullable(),
+  taskType: z.enum(['CALL', 'EMAIL', 'MEETING', 'FOLLOW_UP', 'PROPOSAL', 'ADMIN', 'OTHER']).optional().nullable(),
 })
 
 export async function GET(request: NextRequest) {
@@ -32,6 +37,12 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get('dateTo') // Date range end
     const tagIds = searchParams.get('tagIds') // Comma-separated tag IDs
     const includeArchived = searchParams.get('includeArchived') === 'true' // Include archived tasks
+    const contactId = searchParams.get('contactId')
+    const companyId = searchParams.get('companyId')
+    const dealId = searchParams.get('dealId')
+    const taskType = searchParams.get('taskType')
+    const reminderFrom = searchParams.get('reminderFrom')
+    const reminderTo = searchParams.get('reminderTo')
 
     // Get workspaces where user is owner or member
     const userWorkspaces = await prisma.workspace.findMany({
@@ -148,7 +159,37 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const tasks = await prisma.task.findMany({
+    if (contactId) {
+      where.contactId = contactId
+    }
+
+    if (companyId) {
+      where.companyId = companyId
+    }
+
+    if (dealId) {
+      where.dealId = dealId
+    }
+
+    if (taskType) {
+      where.task_type = taskType
+    }
+
+    if (reminderFrom || reminderTo) {
+      where.reminder_at = {}
+      if (reminderFrom) {
+        const from = new Date(reminderFrom)
+        from.setHours(0, 0, 0, 0)
+        where.reminder_at.gte = from
+      }
+      if (reminderTo) {
+        const to = new Date(reminderTo)
+        to.setHours(23, 59, 59, 999)
+        where.reminder_at.lte = to
+      }
+    }
+
+    const tasks = await (prisma as any).task.findMany({
       where,
       include: {
         project: {
@@ -177,6 +218,30 @@ export async function GET(request: NextRequest) {
             tag: true,
           },
         },
+        contact: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            status: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+            stage: true,
+            value: true,
+          },
+        },
       } as any,
       orderBy: [
         { priority: 'desc' },
@@ -189,6 +254,7 @@ export async function GET(request: NextRequest) {
     const formattedTasks = tasks.map((task: any) => ({
       ...task,
       due_at: task.due_at?.toISOString() || null,
+      reminder_at: task.reminder_at?.toISOString() || null,
       completed_at: task.completed_at?.toISOString() || null,
       created_at: task.created_at.toISOString(),
       updated_at: task.updated_at.toISOString(),
@@ -327,16 +393,60 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const task = await prisma.task.create({
+    if (data.contactId) {
+      const contact = await (prisma as any).contact.findFirst({
+        where: {
+          id: data.contactId,
+          workspaceId: targetWorkspaceId,
+        },
+        select: { id: true },
+      })
+      if (!contact) {
+        return NextResponse.json({ error: 'Contact not found in workspace' }, { status: 404 })
+      }
+    }
+
+    if (data.companyId) {
+      const company = await (prisma as any).company.findFirst({
+        where: {
+          id: data.companyId,
+          workspaceId: targetWorkspaceId,
+        },
+        select: { id: true },
+      })
+      if (!company) {
+        return NextResponse.json({ error: 'Company not found in workspace' }, { status: 404 })
+      }
+    }
+
+    if (data.dealId) {
+      const deal = await (prisma as any).deal.findFirst({
+        where: {
+          id: data.dealId,
+          workspaceId: targetWorkspaceId,
+        },
+        select: { id: true },
+      })
+      if (!deal) {
+        return NextResponse.json({ error: 'Deal not found in workspace' }, { status: 404 })
+      }
+    }
+
+    const task = await (prisma as any).task.create({
       data: {
         userId: session.user.id,
         workspaceId: targetWorkspaceId,
         title: data.title.trim(),
         notes: data.notes?.trim() || null,
         due_at: data.due_at ? new Date(data.due_at) : null,
+        reminder_at: data.reminder_at ? new Date(data.reminder_at) : null,
         priority: data.priority,
         projectId: data.projectId || null,
         responsible: canAssignResponsible ? (data.responsible?.trim() || null) : null,
+        contactId: data.contactId || null,
+        companyId: data.companyId || null,
+        dealId: data.dealId || null,
+        task_type: data.taskType || null,
         status: data.projectId ? 'NOT_STARTED' : 'ACTIVE', // Default to NOT_STARTED for project tasks
       },
       include: {
@@ -364,6 +474,30 @@ export async function POST(request: NextRequest) {
         tags: {
           include: {
             tag: true,
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            status: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+            stage: true,
+            value: true,
           },
         },
       } as any,
@@ -402,9 +536,10 @@ export async function POST(request: NextRequest) {
       })
 
       // Find the user with matching name
+      const ownerUser = workspace?.user ?? null
       const assignedUser = workspaceMembers.find(
         (m) => m.user.name === task.responsible
-      )?.user || (workspace?.user?.name === task.responsible ? workspace.user : null)
+      )?.user || (ownerUser?.name === task.responsible ? ownerUser : null)
 
       if (assignedUser && assignedUser.id !== session.user.id) {
         const taskLink = task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`
@@ -442,6 +577,7 @@ export async function POST(request: NextRequest) {
     const formattedTask = {
       ...task,
       due_at: task.due_at?.toISOString() || null,
+      reminder_at: task.reminder_at?.toISOString() || null,
       completed_at: task.completed_at?.toISOString() || null,
       created_at: task.created_at.toISOString(),
       updated_at: task.updated_at.toISOString(),

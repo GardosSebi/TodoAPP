@@ -175,22 +175,28 @@ export default function KanbanBoard({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 min-w-0">
                             {task.priority > 0 && (
                               <Flag
                                 className={`w-4 h-4 ${getPriorityColor(task.priority)}`}
                               />
                             )}
-                            <h4 className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                            <h4
+                              className="font-medium text-gray-900 dark:text-white text-sm truncate max-w-full flex-1 min-w-0"
+                              title={task.title}
+                            >
                               {task.title}
                             </h4>
                           </div>
                           {task.notes && (
-                            <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
+                            <p
+                              className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 mb-2 break-all max-w-full overflow-hidden"
+                              title={task.notes}
+                            >
                               {task.notes}
                             </p>
                           )}
-                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 min-w-0 overflow-hidden">
                             {dueDate && (
                               <div className={`flex items-center gap-1 ${overdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
                                 <Calendar className="w-3 h-3" />
@@ -206,21 +212,24 @@ export default function KanbanBoard({
                                     : task.project.color 
                                       ? '' 
                                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white'
-                                }`}
+                                } max-w-[140px] truncate inline-block align-middle`}
                                 style={task.project.completed 
                                   ? undefined
                                   : task.project.color ? {
                                       backgroundColor: `${task.project.color}20`,
                                       color: task.project.color,
                                     } : undefined}
+                                title={task.project.name}
                               >
                                 {task.project.name}
                               </span>
                             )}
                             {task.responsible && (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 min-w-0">
                                 <User className="w-3 h-3" />
-                                <span>{task.responsible}</span>
+                                <span className="truncate max-w-[120px]" title={task.responsible}>
+                                  {task.responsible}
+                                </span>
                               </div>
                             )}
                           </div>

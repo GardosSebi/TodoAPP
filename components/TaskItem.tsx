@@ -74,7 +74,8 @@ export default function TaskItem({ task, onUpdate, onDelete, onClick }: TaskItem
                 task.status === 'COMPLETED'
                   ? 'line-through text-gray-500 dark:text-gray-400'
                   : 'text-gray-900 dark:text-white'
-              }`}
+              } truncate max-w-full`}
+              title={task.title}
             >
               {task.title}
             </p>
@@ -88,7 +89,8 @@ export default function TaskItem({ task, onUpdate, onDelete, onClick }: TaskItem
             <p
               className={`text-xs mt-1 text-gray-600 dark:text-gray-300 line-clamp-2 ${
                 task.status === 'COMPLETED' ? 'opacity-60' : ''
-              }`}
+              } break-all`}
+              title={task.notes}
             >
               {task.notes}
             </p>

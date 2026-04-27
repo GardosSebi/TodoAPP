@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Dialog } from '@headlessui/react'
-import { X, Calendar, Flag, FileText, Upload, Image as ImageIcon, File, Trash2, User, Check, Plus, Tag as TagIcon, Archive, ArchiveRestore, Copy, MoreVertical } from 'lucide-react'
+import { X, Calendar, Flag, FileText, Upload, File, Trash2, User, Check, Plus, Tag as TagIcon, Archive, ArchiveRestore, Copy, MoreVertical, Building2, Handshake, Bell } from 'lucide-react'
 import { Task, TaskFile, SubTask, Tag } from '@/types'
 import { formatDate } from '@/lib/utils'
 import CommentsSection from './CommentsSection'
@@ -25,12 +25,17 @@ interface TaskDetailsModalProps {
   onDelete: (taskId: string) => void
 }
 
+type TaskUpdatePayload = Partial<Task> & {
+  taskType?: 'CALL' | 'EMAIL' | 'MEETING' | 'FOLLOW_UP' | 'PROPOSAL' | 'ADMIN' | 'OTHER' | null
+}
+
 export default function TaskDetailsModal({
   task,
   onClose,
   onUpdate,
   onDelete,
 }: TaskDetailsModalProps) {
+  type TaskTypeOption = '' | 'CALL' | 'EMAIL' | 'MEETING' | 'FOLLOW_UP' | 'PROPOSAL' | 'ADMIN' | 'OTHER'
   const [title, setTitle] = useState(task.title)
   const [notes, setNotes] = useState(task.notes || '')
   const [dueDate, setDueDate] = useState(
@@ -38,6 +43,16 @@ export default function TaskDetailsModal({
   )
   const [priority, setPriority] = useState(task.priority)
   const [responsible, setResponsible] = useState(task.responsible || '')
+  const [reminderDate, setReminderDate] = useState(
+    task.reminder_at ? new Date(task.reminder_at).toISOString().split('T')[0] : ''
+  )
+  const [taskType, setTaskType] = useState<TaskTypeOption>((task.task_type as TaskTypeOption) || '')
+  const [contactId, setContactId] = useState(task.contactId || '')
+  const [companyId, setCompanyId] = useState(task.companyId || '')
+  const [dealId, setDealId] = useState(task.dealId || '')
+  const [contacts, setContacts] = useState<any[]>([])
+  const [companies, setCompanies] = useState<any[]>([])
+  const [deals, setDeals] = useState<any[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [files, setFiles] = useState<TaskFile[]>(task.files || [])
   const [isUploading, setIsUploading] = useState(false)
@@ -65,6 +80,13 @@ export default function TaskDetailsModal({
     )
     setPriority(task.priority)
     setResponsible(task.responsible || '')
+    setReminderDate(
+      task.reminder_at ? new Date(task.reminder_at).toISOString().split('T')[0] : ''
+    )
+    setTaskType((task.task_type as TaskTypeOption) || '')
+    setContactId(task.contactId || '')
+    setCompanyId(task.companyId || '')
+    setDealId(task.dealId || '')
     setFiles(task.files || [])
     setArchived((task as any).archived || false)
     // Fetch files, subtasks, tags and workspace members when modal opens
@@ -75,8 +97,53 @@ export default function TaskDetailsModal({
       fetchAvailableTags()
       fetchWorkspaceMembers()
       checkWorkspaceOwnership()
+      fetchCrmOptions()
+      fetchTaskCrmDetails()
     }
   }, [task.id])
+
+  const fetchCrmOptions = async () => {
+    try {
+      const [contactsRes, companiesRes, dealsRes] = await Promise.all([
+        fetch('/api/contacts'),
+        fetch('/api/companies'),
+        fetch('/api/deals'),
+      ])
+
+      if (contactsRes.ok) {
+        const data = await contactsRes.json()
+        setContacts(data.contacts || [])
+      }
+      if (companiesRes.ok) {
+        const data = await companiesRes.json()
+        setCompanies(data.companies || [])
+      }
+      if (dealsRes.ok) {
+        const data = await dealsRes.json()
+        setDeals(data.deals || [])
+      }
+    } catch (error) {
+      // Error fetching CRM options
+    }
+  }
+
+  const fetchTaskCrmDetails = async () => {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`)
+      if (!res.ok) return
+      const data = await res.json()
+      const currentTask = data.task
+      setContactId(currentTask.contactId || '')
+      setCompanyId(currentTask.companyId || '')
+      setDealId(currentTask.dealId || '')
+      setTaskType((currentTask.task_type as TaskTypeOption) || '')
+      setReminderDate(
+        currentTask.reminder_at ? new Date(currentTask.reminder_at).toISOString().split('T')[0] : ''
+      )
+    } catch (error) {
+      // Error fetching task CRM details
+    }
+  }
 
   const fetchWorkspaceMembers = async () => {
     try {
@@ -519,12 +586,17 @@ export default function TaskDetailsModal({
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const updates: Partial<Task> = {
+      const updates: TaskUpdatePayload = {
         title: title.trim(),
         notes: notes.trim() || null,
         priority,
         due_at: dueDate ? new Date(dueDate).toISOString() : null,
+        reminder_at: reminderDate ? new Date(reminderDate).toISOString() : null,
         responsible: responsible || null,
+        taskType: taskType || null,
+        contactId: contactId || null,
+        companyId: companyId || null,
+        dealId: dealId || null,
       }
       await onUpdate(task.id, updates)
       onClose()
@@ -646,6 +718,19 @@ export default function TaskDetailsModal({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <Bell className="w-4 h-4" />
+                  Reminder
+                </label>
+                <input
+                  type="date"
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
                   <Flag className="w-4 h-4" />
                   Prioritate
                 </label>
@@ -675,6 +760,83 @@ export default function TaskDetailsModal({
                   {workspaceMembers.map((member) => (
                     <option key={member.userId} value={member.user.name}>
                       {member.user.name} {member.role === 'OWNER' ? '(Owner)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Task Type
+                </label>
+                <select
+                  value={taskType}
+                  onChange={(e) => setTaskType(e.target.value as TaskTypeOption)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Fără tip</option>
+                  <option value="CALL">Call</option>
+                  <option value="EMAIL">Email</option>
+                  <option value="MEETING">Meeting</option>
+                  <option value="FOLLOW_UP">Follow-up</option>
+                  <option value="PROPOSAL">Proposal</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Contact asociat
+                </label>
+                <select
+                  value={contactId}
+                  onChange={(e) => setContactId(e.target.value)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Fără contact</option>
+                  {contacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.first_name} {contact.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Companie asociată
+                </label>
+                <select
+                  value={companyId}
+                  onChange={(e) => setCompanyId(e.target.value)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Fără companie</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-2">
+                  <Handshake className="w-4 h-4" />
+                  Opportunity asociat
+                </label>
+                <select
+                  value={dealId}
+                  onChange={(e) => setDealId(e.target.value)}
+                  className="w-full px-3 py-2 text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Fără opportunity</option>
+                  {deals.map((deal) => (
+                    <option key={deal.id} value={deal.id}>
+                      {deal.title}
                     </option>
                   ))}
                 </select>

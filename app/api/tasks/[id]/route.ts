@@ -9,15 +9,20 @@ const updateTaskSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   notes: z.string().optional().nullable(),
   due_at: z.string().datetime().optional().nullable(),
+  reminder_at: z.string().datetime().optional().nullable(),
   priority: z.number().int().min(0).max(3).optional(),
   projectId: z.string().uuid().optional().nullable(),
   status: z.enum(['ACTIVE', 'COMPLETED', 'NOT_STARTED', 'IN_PROGRESS', 'FINISHED']).optional(),
   responsible: z.string().max(100).optional().nullable(),
+  contactId: z.string().uuid().optional().nullable(),
+  companyId: z.string().uuid().optional().nullable(),
+  dealId: z.string().uuid().optional().nullable(),
+  taskType: z.enum(['CALL', 'EMAIL', 'MEETING', 'FOLLOW_UP', 'PROPOSAL', 'ADMIN', 'OTHER']).optional().nullable(),
   archived: z.boolean().optional(),
 })
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -28,7 +33,7 @@ export async function GET(
     }
 
     // Get task and check workspace access
-    const task = await prisma.task.findFirst({
+    const task = await (prisma as any).task.findFirst({
       where: {
         id,
       },
@@ -65,6 +70,30 @@ export async function GET(
             uploaded_at: 'desc',
           },
         },
+        contact: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            status: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+            stage: true,
+            value: true,
+          },
+        },
       },
     })
 
@@ -88,6 +117,7 @@ export async function GET(
     const formattedTask = {
       ...task,
       due_at: task.due_at?.toISOString() || null,
+      reminder_at: task.reminder_at?.toISOString() || null,
       completed_at: task.completed_at?.toISOString() || null,
       created_at: task.created_at.toISOString(),
       updated_at: task.updated_at.toISOString(),
@@ -108,7 +138,7 @@ export async function GET(
             updated_at: task.project.updated_at.toISOString(),
           }
         : null,
-      files: task.files.map((file) => ({
+      files: task.files.map((file: any) => ({
         ...file,
         uploaded_at: file.uploaded_at.toISOString(),
       })),
@@ -139,7 +169,7 @@ export async function PATCH(
     const data = updateTaskSchema.parse(body)
 
     // Get task and check workspace access
-    const existingTask = await prisma.task.findFirst({
+    const existingTask = await (prisma as any).task.findFirst({
       where: {
         id,
       },
@@ -226,6 +256,45 @@ export async function PATCH(
       }
     }
 
+    if (data.contactId) {
+      const contact = await (prisma as any).contact.findFirst({
+        where: {
+          id: data.contactId,
+          workspaceId: existingTask.workspaceId,
+        },
+        select: { id: true },
+      })
+      if (!contact) {
+        return NextResponse.json({ error: 'Contact not found in workspace' }, { status: 404 })
+      }
+    }
+
+    if (data.companyId) {
+      const company = await (prisma as any).company.findFirst({
+        where: {
+          id: data.companyId,
+          workspaceId: existingTask.workspaceId,
+        },
+        select: { id: true },
+      })
+      if (!company) {
+        return NextResponse.json({ error: 'Company not found in workspace' }, { status: 404 })
+      }
+    }
+
+    if (data.dealId) {
+      const deal = await (prisma as any).deal.findFirst({
+        where: {
+          id: data.dealId,
+          workspaceId: existingTask.workspaceId,
+        },
+        select: { id: true },
+      })
+      if (!deal) {
+        return NextResponse.json({ error: 'Deal not found in workspace' }, { status: 404 })
+      }
+    }
+
     const updateData: any = {}
 
     if (data.title !== undefined) {
@@ -237,11 +306,26 @@ export async function PATCH(
     if (data.due_at !== undefined) {
       updateData.due_at = data.due_at ? new Date(data.due_at) : null
     }
+    if (data.reminder_at !== undefined) {
+      updateData.reminder_at = data.reminder_at ? new Date(data.reminder_at) : null
+    }
     if (data.priority !== undefined) {
       updateData.priority = data.priority
     }
     if (data.projectId !== undefined) {
       updateData.projectId = data.projectId || null
+    }
+    if (data.contactId !== undefined) {
+      updateData.contactId = data.contactId || null
+    }
+    if (data.companyId !== undefined) {
+      updateData.companyId = data.companyId || null
+    }
+    if (data.dealId !== undefined) {
+      updateData.dealId = data.dealId || null
+    }
+    if (data.taskType !== undefined) {
+      updateData.task_type = data.taskType || null
     }
     if (data.status !== undefined) {
       // Map FINISHED to COMPLETED for database
@@ -263,7 +347,7 @@ export async function PATCH(
       updateData.archived = data.archived
     }
 
-    const task = await prisma.task.update({
+    const task = await (prisma as any).task.update({
       where: { id },
       data: updateData,
       include: {
@@ -280,6 +364,30 @@ export async function PATCH(
         files: {
           orderBy: {
             uploaded_at: 'desc',
+          },
+        },
+        contact: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            status: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        deal: {
+          select: {
+            id: true,
+            title: true,
+            stage: true,
+            value: true,
           },
         },
       },
@@ -399,9 +507,10 @@ export async function PATCH(
       })
 
       // Find the user with matching name
+      const ownerUser = workspace?.user ?? null
       const assignedUser = workspaceMembers.find(
         (m) => m.user.name === task.responsible
-      )?.user || (workspace?.user?.name === task.responsible ? workspace.user : null)
+      )?.user || (ownerUser?.name === task.responsible ? ownerUser : null)
 
       if (assignedUser && assignedUser.id !== session.user.id) {
         const taskLink = task.projectId ? `/app/project/${task.projectId}?task=${task.id}` : `/app?task=${task.id}`
@@ -438,6 +547,7 @@ export async function PATCH(
     const formattedTask = {
       ...task,
       due_at: task.due_at?.toISOString() || null,
+      reminder_at: task.reminder_at?.toISOString() || null,
       completed_at: task.completed_at?.toISOString() || null,
       created_at: task.created_at.toISOString(),
       updated_at: task.updated_at.toISOString(),
@@ -448,7 +558,7 @@ export async function PATCH(
             updated_at: task.project.updated_at.toISOString(),
           }
         : null,
-      files: task.files.map((file) => ({
+      files: task.files.map((file: any) => ({
         ...file,
         uploaded_at: file.uploaded_at.toISOString(),
       })),
@@ -478,7 +588,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -489,7 +599,7 @@ export async function DELETE(
     }
 
     // Get task and check workspace access
-    const task = await prisma.task.findFirst({
+    const task = await (prisma as any).task.findFirst({
       where: {
         id,
       },
@@ -536,7 +646,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    await prisma.task.delete({
+    await (prisma as any).task.delete({
       where: { id },
     })
 

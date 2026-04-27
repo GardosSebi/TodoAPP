@@ -23,6 +23,9 @@ import {
   FileText,
   MessageCircle,
   GripVertical,
+  Users,
+  Building2,
+  Handshake,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -443,6 +446,9 @@ export default function Sidebar() {
     { href: '/app/completed', label: 'Finalizate', icon: CheckCircleIcon },
     { href: '/app/archived', label: 'Arhivate', icon: Archive },
     { href: '/app/templates', label: 'Template', icon: FileText },
+    { href: '/app/crm/contacts', label: 'Contacts', icon: Users },
+    { href: '/app/crm/companies', label: 'Companies', icon: Building2 },
+    { href: '/app/crm/deals', label: 'Deals', icon: Handshake },
   ]
 
   const isActive = (href: string) => {
