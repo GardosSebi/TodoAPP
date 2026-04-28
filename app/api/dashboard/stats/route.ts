@@ -225,6 +225,62 @@ export async function GET(request: NextRequest) {
 
     const completionRate = totalTasks > 0 ? Math.round((completedTasksTotal / totalTasks) * 100) : 0
 
+    // 5. CRM Statistics
+    const totalContacts = await (prisma as any).contact.count({
+      where: { workspaceId: { in: workspaceIds } },
+    })
+    const totalCompanies = await (prisma as any).company.count({
+      where: { workspaceId: { in: workspaceIds } },
+    })
+    const totalDeals = await (prisma as any).deal.count({
+      where: { workspaceId: { in: workspaceIds } },
+    })
+    const activeDeals = await (prisma as any).deal.count({
+      where: {
+        workspaceId: { in: workspaceIds },
+        stage: { in: ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION'] },
+      },
+    })
+    const wonDeals = await (prisma as any).deal.count({
+      where: { workspaceId: { in: workspaceIds }, stage: 'WON' },
+    })
+    const conversionRate = totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const overdueFollowUps = await prisma.task.count({
+      where: {
+        workspaceId: { in: workspaceIds },
+        archived: false,
+        status: { in: ['ACTIVE', 'NOT_STARTED', 'IN_PROGRESS'] },
+        reminder_at: { lt: today },
+      },
+    })
+    const upcomingFollowUps = await prisma.task.count({
+      where: {
+        workspaceId: { in: workspaceIds },
+        archived: false,
+        status: { in: ['ACTIVE', 'NOT_STARTED', 'IN_PROGRESS'] },
+        reminder_at: { gte: today, lt: tomorrow },
+      },
+    })
+
+    const dealsByStageRaw = await (prisma as any).deal.groupBy({
+      by: ['stage'],
+      where: { workspaceId: { in: workspaceIds } },
+      _count: { stage: true },
+      _sum: { value: true },
+    })
+    const dealsByStage = dealsByStageRaw.map((item: any) => ({
+      stage: item.stage,
+      count: item._count.stage || 0,
+      value: item._sum.value || 0,
+    }))
+    const pipelineTotalValue = dealsByStage.reduce((acc: number, item: any) => acc + (item.value || 0), 0)
+
     return NextResponse.json({
       projectProgress,
       completedTasksByPeriod: completedTasksByPeriodFormatted,
@@ -235,6 +291,16 @@ export async function GET(request: NextRequest) {
         completedTasks: completedTasksTotal,
         completionRate,
         totalProjects: accessibleProjects.length,
+      },
+      crmStats: {
+        totalContacts,
+        totalCompanies,
+        activeDeals,
+        overdueFollowUps,
+        upcomingFollowUps,
+        dealsByStage,
+        pipelineTotalValue,
+        conversionRate,
       },
     })
   } catch (error) {

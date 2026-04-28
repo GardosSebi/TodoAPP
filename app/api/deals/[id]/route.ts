@@ -137,6 +137,17 @@ export async function PATCH(
       data: updateData,
     })
 
+    if (data.stage !== undefined) {
+      await prisma.activity.create({
+        data: {
+          workspaceId: existingDeal.workspaceId,
+          userId: session.user.id,
+          type: 'DEAL_STAGE_UPDATED',
+          description: `Stadiu oportunitate actualizat la ${data.stage}`,
+        },
+      })
+    }
+
     return NextResponse.json({
       deal: {
         ...deal,

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { dealStageBadgeClass, dealStageLabel } from '@/lib/crmLabels'
 
 type DealStage = 'NEW' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST'
 
@@ -31,17 +32,10 @@ interface DealsClientProps {
   contacts: ContactOption[]
 }
 
-const stageLabel: Record<DealStage, string> = {
-  NEW: 'Nou',
-  QUALIFIED: 'Calificat',
-  PROPOSAL: 'Propunere',
-  NEGOTIATION: 'Negociere',
-  WON: 'Câștigat',
-  LOST: 'Pierdut',
-}
-
 export default function DealsClient({ initialDeals, companies, contacts }: DealsClientProps) {
   const [deals, setDeals] = useState<DealItem[]>(initialDeals)
+  const [search, setSearch] = useState('')
+  const [stageFilter, setStageFilter] = useState<'ALL' | DealStage>('ALL')
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -130,6 +124,18 @@ export default function DealsClient({ initialDeals, companies, contacts }: Deals
     }
   }
 
+  const filteredDeals = deals.filter((deal) => {
+    const query = search.trim().toLowerCase()
+    const matchesSearch =
+      !query ||
+      deal.title.toLowerCase().includes(query) ||
+      (deal.company?.name || '').toLowerCase().includes(query) ||
+      `${deal.contact?.first_name || ''} ${deal.contact?.last_name || ''}`.toLowerCase().includes(query)
+
+    const matchesStage = stageFilter === 'ALL' || deal.stage === stageFilter
+    return matchesSearch && matchesStage
+  })
+
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6 flex items-start justify-between gap-4">
@@ -146,6 +152,28 @@ export default function DealsClient({ initialDeals, companies, contacts }: Deals
         >
           {showForm ? 'Închide' : 'Creează oportunitate'}
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-col md:flex-row gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Caută oportunități după titlu, companie sau contact..."
+          className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        />
+        <select
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value as 'ALL' | DealStage)}
+          className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        >
+          <option value="ALL">Toate stadiile</option>
+          <option value="NEW">Nou</option>
+          <option value="QUALIFIED">Calificat</option>
+          <option value="PROPOSAL">Propunere</option>
+          <option value="NEGOTIATION">Negociere</option>
+          <option value="WON">Câștigat</option>
+          <option value="LOST">Pierdut</option>
+        </select>
       </div>
 
       {showForm && (
@@ -245,7 +273,7 @@ export default function DealsClient({ initialDeals, companies, contacts }: Deals
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {deals.map((deal) => (
+        {filteredDeals.map((deal) => (
           <Link
             key={deal.id}
             href={`/app/crm/deals/${deal.id}`}
@@ -257,14 +285,19 @@ export default function DealsClient({ initialDeals, companies, contacts }: Deals
               {deal.contact ? `${deal.contact.first_name} ${deal.contact.last_name}` : 'Fără contact'}
             </p>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                {stageLabel[deal.stage]}
+              <span className={`text-xs px-2 py-1 rounded ${dealStageBadgeClass[deal.stage]}`}>
+                {dealStageLabel[deal.stage]}
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">{deal.value} EUR</span>
             </div>
           </Link>
         ))}
       </div>
+      {filteredDeals.length === 0 && (
+        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          Nu există oportunități pentru filtrele selectate.
+        </div>
+      )}
     </div>
   )
 }

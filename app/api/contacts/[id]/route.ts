@@ -120,6 +120,17 @@ export async function PATCH(
       data: updateData,
     })
 
+    if (data.status !== undefined) {
+      await prisma.activity.create({
+        data: {
+          workspaceId: existingContact.workspaceId,
+          userId: session.user.id,
+          type: 'CONTACT_STATUS_UPDATED',
+          description: `Status contact actualizat la ${data.status}`,
+        },
+      })
+    }
+
     return NextResponse.json({
       contact: {
         ...contact,

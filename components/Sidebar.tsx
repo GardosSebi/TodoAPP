@@ -449,6 +449,7 @@ export default function Sidebar() {
     { href: '/app/crm/contacts', label: 'Contacts', icon: Users },
     { href: '/app/crm/companies', label: 'Companies', icon: Building2 },
     { href: '/app/crm/deals', label: 'Deals', icon: Handshake },
+    { href: '/app/crm/followups', label: 'Follow-ups', icon: ClockIcon },
   ]
 
   const isActive = (href: string) => {

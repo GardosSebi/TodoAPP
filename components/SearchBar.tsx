@@ -1,17 +1,47 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, FileText, Folder } from 'lucide-react'
+import { Search, X, FileText, Folder, Users, Building2, Handshake } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Task, Project } from '@/types'
 
 interface SearchResult {
   tasks: Task[]
   projects: Project[]
+  contacts?: any[]
+  companies?: any[]
+  deals?: any[]
 }
 
 interface SearchBarProps {
   onResultClick?: (type: 'task' | 'project', id: string) => void
+}
+
+function scoreRelevance(text: string, query: string): number {
+  const haystack = text.toLowerCase()
+  const needle = query.toLowerCase().trim()
+  if (!needle) return 0
+  if (haystack === needle) return 120
+  if (haystack.startsWith(needle)) return 90
+  const idx = haystack.indexOf(needle)
+  if (idx >= 0) return 70 - Math.min(idx, 40)
+  return 0
+}
+
+function highlightMatch(text: string, query: string) {
+  if (!query.trim()) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escaped})`, 'ig')
+  const parts = text.split(regex)
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={`${part}-${i}`} className="bg-yellow-200/70 text-inherit dark:bg-yellow-400/40 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      <span key={`${part}-${i}`}>{part}</span>
+    )
+  )
 }
 
 export default function SearchBar({ onResultClick }: SearchBarProps) {
@@ -98,6 +128,27 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
     }
   }
 
+  const trimmedQuery = query.trim()
+  const sortedTasks = [...results.tasks].sort((a, b) => {
+    const aScore = Math.max(scoreRelevance(a.title || '', trimmedQuery), scoreRelevance(a.project?.name || '', trimmedQuery))
+    const bScore = Math.max(scoreRelevance(b.title || '', trimmedQuery), scoreRelevance(b.project?.name || '', trimmedQuery))
+    return bScore - aScore
+  })
+  const sortedProjects = [...results.projects].sort(
+    (a, b) => scoreRelevance((b as any).name || '', trimmedQuery) - scoreRelevance((a as any).name || '', trimmedQuery)
+  )
+  const sortedContacts = [...(results.contacts || [])].sort((a: any, b: any) => {
+    const aText = `${a.first_name || ''} ${a.last_name || ''} ${a.email || ''}`.trim()
+    const bText = `${b.first_name || ''} ${b.last_name || ''} ${b.email || ''}`.trim()
+    return scoreRelevance(bText, trimmedQuery) - scoreRelevance(aText, trimmedQuery)
+  })
+  const sortedCompanies = [...(results.companies || [])].sort(
+    (a: any, b: any) => scoreRelevance(b.name || '', trimmedQuery) - scoreRelevance(a.name || '', trimmedQuery)
+  )
+  const sortedDeals = [...(results.deals || [])].sort(
+    (a: any, b: any) => scoreRelevance(b.title || '', trimmedQuery) - scoreRelevance(a.title || '', trimmedQuery)
+  )
+
   return (
     <div ref={searchRef} className="relative w-full max-w-md">
       <div className="relative">
@@ -108,7 +159,7 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim() && setIsOpen(true)}
-          placeholder="Caută sarcini și proiecte... (Ctrl+K)"
+          placeholder="Caută sarcini, proiecte, contacte, companii... (Ctrl+K)"
           className="w-full pl-10 pr-10 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {query && (
@@ -124,24 +175,28 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
         )}
       </div>
 
-      {isOpen && (query.trim() || results.tasks.length > 0 || results.projects.length > 0) && (
+      {isOpen && (query.trim() || sortedTasks.length > 0 || sortedProjects.length > 0) && (
         <div className="absolute top-full mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto custom-scrollbar">
           {isSearching ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">
               Căutare...
             </div>
-          ) : results.tasks.length === 0 && results.projects.length === 0 ? (
+          ) : sortedTasks.length === 0 &&
+            sortedProjects.length === 0 &&
+            sortedContacts.length === 0 &&
+            sortedCompanies.length === 0 &&
+            sortedDeals.length === 0 ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              Nu s-au găsit rezultate
+              Nu s-au găsit rezultate pentru "{query.trim()}"
             </div>
           ) : (
             <>
-              {results.tasks.length > 0 && (
+              {sortedTasks.length > 0 && (
                 <div className="p-2">
                   <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                    Sarcini ({results.tasks.length})
+                    Sarcini ({sortedTasks.length})
                   </div>
-                  {results.tasks.map((task) => (
+                  {sortedTasks.map((task) => (
                     <button
                       key={task.id}
                       onClick={() => handleTaskClick(task.id, task.projectId || undefined)}
@@ -150,11 +205,11 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
                       <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-gray-900 dark:text-white truncate">
-                          {task.title}
+                          {highlightMatch(task.title, trimmedQuery)}
                         </div>
                         {task.project && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {task.project.name}
+                            {highlightMatch(task.project.name, trimmedQuery)}
                           </div>
                         )}
                       </div>
@@ -163,12 +218,12 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
                 </div>
               )}
 
-              {results.projects.length > 0 && (
+              {sortedProjects.length > 0 && (
                 <div className="p-2 border-t border-gray-200 dark:border-gray-700">
                   <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                    Proiecte ({results.projects.length})
+                    Proiecte ({sortedProjects.length})
                   </div>
-                  {results.projects.map((project) => (
+                  {sortedProjects.map((project) => (
                     <button
                       key={project.id}
                       onClick={() => handleProjectClick(project.id)}
@@ -186,12 +241,68 @@ export default function SearchBar({ onResultClick }: SearchBarProps) {
                             ? 'text-green-700 dark:text-green-300' 
                             : 'text-gray-900 dark:text-white'
                         }`}>
-                          {project.name}
+                          {highlightMatch(project.name, trimmedQuery)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {(project as any).taskCount || 0} sarcini
                         </div>
                       </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {sortedContacts.length > 0 && (
+                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                    Contacte ({sortedContacts.length})
+                  </div>
+                  {sortedContacts.map((contact: any) => (
+                    <button
+                      key={contact.id}
+                      onClick={() => router.push(`/app/crm/contacts/${contact.id}`)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-3"
+                    >
+                      <Users className="w-4 h-4 text-gray-400" />
+                      <span className="truncate text-gray-900 dark:text-white">
+                        {highlightMatch(`${contact.first_name} ${contact.last_name}`, trimmedQuery)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {sortedCompanies.length > 0 && (
+                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                    Companii ({sortedCompanies.length})
+                  </div>
+                  {sortedCompanies.map((company: any) => (
+                    <button
+                      key={company.id}
+                      onClick={() => router.push(`/app/crm/companies/${company.id}`)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-3"
+                    >
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <span className="truncate text-gray-900 dark:text-white">{highlightMatch(company.name, trimmedQuery)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {sortedDeals.length > 0 && (
+                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                    Oportunități ({sortedDeals.length})
+                  </div>
+                  {sortedDeals.map((deal: any) => (
+                    <button
+                      key={deal.id}
+                      onClick={() => router.push(`/app/crm/deals/${deal.id}`)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg flex items-center gap-3"
+                    >
+                      <Handshake className="w-4 h-4 text-gray-400" />
+                      <span className="truncate text-gray-900 dark:text-white">{highlightMatch(deal.title, trimmedQuery)}</span>
                     </button>
                   ))}
                 </div>

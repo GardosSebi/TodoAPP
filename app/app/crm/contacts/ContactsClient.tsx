@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { contactStatusBadgeClass, contactStatusLabel } from '@/lib/crmLabels'
 
 interface CompanyOption {
   id: string
@@ -19,6 +20,7 @@ interface ContactItem {
     id: string
     name: string
   } | null
+  tags?: string[]
 }
 
 interface ContactsClientProps {
@@ -28,6 +30,9 @@ interface ContactsClientProps {
 
 export default function ContactsClient({ initialContacts, companies }: ContactsClientProps) {
   const [contacts, setContacts] = useState<ContactItem[]>(initialContacts)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [tagFilter, setTagFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -40,6 +45,17 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
   const [status, setStatus] = useState<'LEAD' | 'PROSPECT' | 'CUSTOMER' | 'PARTNER' | 'INACTIVE'>('LEAD')
   const [companyId, setCompanyId] = useState('')
   const [notes, setNotes] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
+
+  const parseTags = (value: string) =>
+    Array.from(
+      new Set(
+        value
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      )
+    )
 
   const resetForm = () => {
     setFirstName('')
@@ -50,6 +66,7 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
     setStatus('LEAD')
     setCompanyId('')
     setNotes('')
+    setTagsInput('')
     setError('')
   }
 
@@ -75,7 +92,7 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
           status,
           companyId: companyId || null,
           notes: notes.trim() || null,
-          tags: [],
+          tags: parseTags(tagsInput),
         }),
       })
 
@@ -93,6 +110,7 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
         email: data.contact.email,
         phone: data.contact.phone,
         status: data.contact.status,
+        tags: data.contact.tags || [],
         company: selectedCompany ? { id: selectedCompany.id, name: selectedCompany.name } : null,
       }
 
@@ -105,6 +123,21 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
       setLoading(false)
     }
   }
+
+  const filteredContacts = contacts.filter((contact) => {
+    const query = search.trim().toLowerCase()
+    const matchesSearch =
+      !query ||
+      `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(query) ||
+      (contact.email || '').toLowerCase().includes(query) ||
+      (contact.company?.name || '').toLowerCase().includes(query)
+
+    const matchesStatus = statusFilter === 'ALL' || contact.status === statusFilter
+    const currentTagFilter = tagFilter.trim().toLowerCase()
+    const matchesTag =
+      !currentTagFilter || (contact.tags || []).some((tag) => tag.toLowerCase().includes(currentTagFilter))
+    return matchesSearch && matchesStatus && matchesTag
+  })
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6">
@@ -122,6 +155,33 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
         >
           {showForm ? 'Închide' : 'Creează contact'}
         </button>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Caută contacte după nume, email sau companie..."
+          className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        >
+          <option value="ALL">Toate statusurile</option>
+          <option value="LEAD">Lead</option>
+          <option value="PROSPECT">Prospect</option>
+          <option value="CUSTOMER">Client</option>
+          <option value="PARTNER">Partener</option>
+          <option value="INACTIVE">Inactiv</option>
+        </select>
+        <input
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          placeholder="Filtru după etichetă..."
+          className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        />
       </div>
 
       {showForm && (
@@ -164,11 +224,11 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
             onChange={(e) => setStatus(e.target.value as any)}
             className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
           >
-            <option value="LEAD">LEAD</option>
-            <option value="PROSPECT">PROSPECT</option>
-            <option value="CUSTOMER">CUSTOMER</option>
-            <option value="PARTNER">PARTNER</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="LEAD">Lead</option>
+            <option value="PROSPECT">Prospect</option>
+            <option value="CUSTOMER">Client</option>
+            <option value="PARTNER">Partener</option>
+            <option value="INACTIVE">Inactiv</option>
           </select>
           <select
             value={companyId}
@@ -187,6 +247,12 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notițe"
             rows={3}
+            className="md:col-span-2 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+          />
+          <input
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="Etichete (separate prin virgulă): client, urgent, webinar"
             className="md:col-span-2 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
           />
           {error && <p className="md:col-span-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -213,7 +279,7 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {contacts.map((contact) => (
+        {filteredContacts.map((contact) => (
           <Link
             key={contact.id}
             href={`/app/crm/contacts/${contact.id}`}
@@ -225,16 +291,33 @@ export default function ContactsClient({ initialContacts, companies }: ContactsC
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{contact.email || 'Fără email'}</p>
             <p className="text-sm text-gray-600 dark:text-gray-300">{contact.phone || 'Fără telefon'}</p>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                {contact.status}
+              <span className={`text-xs px-2 py-1 rounded ${contactStatusBadgeClass[contact.status]}`}>
+                {contactStatusLabel[contact.status]}
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {contact.company?.name || 'Fără companie'}
               </span>
             </div>
+            {(contact.tags || []).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(contact.tags || []).slice(0, 4).map((tag) => (
+                  <span
+                    key={`${contact.id}-${tag}`}
+                    className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </Link>
         ))}
       </div>
+      {filteredContacts.length === 0 && (
+        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          Nu există contacte pentru filtrele selectate.
+        </div>
+      )}
     </div>
   )
 }

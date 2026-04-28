@@ -50,13 +50,32 @@ interface OverallStats {
   totalProjects: number
 }
 
+interface DealStageStat {
+  stage: 'NEW' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST'
+  count: number
+  value: number
+}
+
+interface CrmStats {
+  totalContacts: number
+  totalCompanies: number
+  activeDeals: number
+  overdueFollowUps: number
+  upcomingFollowUps: number
+  dealsByStage: DealStageStat[]
+  pipelineTotalValue: number
+  conversionRate: number
+}
+
 export default function DashboardClient() {
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([])
   const [completedTasksByPeriod, setCompletedTasksByPeriod] = useState<CompletedTaskByPeriod[]>([])
   const [productivityByDay, setProductivityByDay] = useState<ProductivityByDay[]>([])
   const [overallStats, setOverallStats] = useState<OverallStats | null>(null)
+  const [crmStats, setCrmStats] = useState<CrmStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<'week' | 'month'>('week')
+  const [section, setSection] = useState<'tasks' | 'crm'>('tasks')
   const [isDark, setIsDark] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
@@ -87,6 +106,7 @@ export default function DashboardClient() {
         setCompletedTasksByPeriod(data.completedTasksByPeriod || [])
         setProductivityByDay(data.productivityByDay || [])
         setOverallStats(data.overallStats || null)
+        setCrmStats(data.crmStats || null)
       }
     } catch (error) {
       // Error fetching dashboard stats
@@ -104,6 +124,14 @@ export default function DashboardClient() {
   const tooltipBg = isDark ? '#0f172a' : '#fff'
   const tooltipBorder = isDark ? '#1e293b' : '#e5e7eb'
   const tooltipText = isDark ? '#cbd5e1' : '#111827'
+  const stageLabel: Record<DealStageStat['stage'], string> = {
+    NEW: 'Nou',
+    QUALIFIED: 'Calificat',
+    PROPOSAL: 'Propunere',
+    NEGOTIATION: 'Negociere',
+    WON: 'Câștigat',
+    LOST: 'Pierdut',
+  }
 
   if (loading) {
     return (
@@ -117,28 +145,53 @@ export default function DashboardClient() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setPeriod('week')}
+            onClick={() => setSection('tasks')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              period === 'week'
+              section === 'tasks'
                 ? 'bg-blue-600 text-white dark:bg-blue-500'
                 : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
-            Săptămâna
+            Task-uri
           </button>
           <button
-            onClick={() => setPeriod('month')}
+            onClick={() => setSection('crm')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              period === 'month'
+              section === 'crm'
                 ? 'bg-blue-600 text-white dark:bg-blue-500'
                 : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
           >
-            Luna
+            CRM
           </button>
         </div>
+      </div>
+
+      {section === 'tasks' && (
+        <>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPeriod('week')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            period === 'week'
+              ? 'bg-blue-600 text-white dark:bg-blue-500'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+          }`}
+        >
+          Săptămâna
+        </button>
+        <button
+          onClick={() => setPeriod('month')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            period === 'month'
+              ? 'bg-blue-600 text-white dark:bg-blue-500'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+          }`}
+        >
+          Luna
+        </button>
       </div>
 
       {/* Overall Stats Cards */}
@@ -508,6 +561,67 @@ export default function DashboardClient() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {section === 'crm' && crmStats && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Contacte</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{crmStats.totalContacts}</p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Companii</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{crmStats.totalCompanies}</p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Oportunități active</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{crmStats.activeDeals}</p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Conversie</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{crmStats.conversionRate}%</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Follow-ups</h2>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Astăzi</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{crmStats.upcomingFollowUps}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Întârziate</span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">{crmStats.overdueFollowUps}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Valoare pipeline totală</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{crmStats.pipelineTotalValue} EUR</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pipeline pe stadii</h2>
+              {crmStats.dealsByStage.length > 0 ? (
+                <div className="space-y-2">
+                  {crmStats.dealsByStage.map((item) => (
+                    <div key={item.stage} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700 dark:text-gray-300">{stageLabel[item.stage]}</span>
+                      <span className="text-gray-900 dark:text-white font-medium">{item.count} ({item.value} EUR)</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 dark:text-gray-400">Nu există date de pipeline.</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

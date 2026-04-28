@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { companyStatusBadgeClass, companyStatusLabel } from '@/lib/crmLabels'
 
 interface CompanyItem {
   id: string
@@ -23,6 +24,8 @@ interface CompaniesClientProps {
 
 export default function CompaniesClient({ initialCompanies }: CompaniesClientProps) {
   const [companies, setCompanies] = useState<CompanyItem[]>(initialCompanies)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -99,6 +102,18 @@ export default function CompaniesClient({ initialCompanies }: CompaniesClientPro
     }
   }
 
+  const filteredCompanies = companies.filter((company) => {
+    const query = search.trim().toLowerCase()
+    const matchesSearch =
+      !query ||
+      company.name.toLowerCase().includes(query) ||
+      (company.website || '').toLowerCase().includes(query) ||
+      (company.industry || '').toLowerCase().includes(query)
+
+    const matchesStatus = statusFilter === 'ALL' || company.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6">
       <div className="mb-4 md:mb-6 flex items-start justify-between gap-4">
@@ -115,6 +130,27 @@ export default function CompaniesClient({ initialCompanies }: CompaniesClientPro
         >
           {showForm ? 'Închide' : 'Creează companie'}
         </button>
+      </div>
+
+      <div className="mb-4 flex flex-col md:flex-row gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Caută companii după nume, website sau industrie..."
+          className="flex-1 px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
+        >
+          <option value="ALL">Toate statusurile</option>
+          <option value="LEAD">Lead</option>
+          <option value="ACTIVE_CUSTOMER">Client activ</option>
+          <option value="PAST_CUSTOMER">Client anterior</option>
+          <option value="PARTNER">Partener</option>
+          <option value="INACTIVE">Inactiv</option>
+        </select>
       </div>
 
       {showForm && (
@@ -157,11 +193,11 @@ export default function CompaniesClient({ initialCompanies }: CompaniesClientPro
             onChange={(e) => setStatus(e.target.value as any)}
             className="px-3 py-2 text-sm text-black dark:text-white bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg"
           >
-            <option value="LEAD">LEAD</option>
-            <option value="ACTIVE_CUSTOMER">ACTIVE_CUSTOMER</option>
-            <option value="PAST_CUSTOMER">PAST_CUSTOMER</option>
-            <option value="PARTNER">PARTNER</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="LEAD">Lead</option>
+            <option value="ACTIVE_CUSTOMER">Client activ</option>
+            <option value="PAST_CUSTOMER">Client anterior</option>
+            <option value="PARTNER">Partener</option>
+            <option value="INACTIVE">Inactiv</option>
           </select>
           <textarea
             value={notes}
@@ -194,7 +230,7 @@ export default function CompaniesClient({ initialCompanies }: CompaniesClientPro
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {companies.map((company) => (
+        {filteredCompanies.map((company) => (
           <Link
             key={company.id}
             href={`/app/crm/companies/${company.id}`}
@@ -204,16 +240,21 @@ export default function CompaniesClient({ initialCompanies }: CompaniesClientPro
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{company.website || 'Fără website'}</p>
             <p className="text-sm text-gray-600 dark:text-gray-300">{company.industry || 'Fără industrie'}</p>
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
-                {company.status}
+              <span className={`text-xs px-2 py-1 rounded ${companyStatusBadgeClass[company.status]}`}>
+                {companyStatusLabel[company.status]}
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {company._count.contacts} contacts / {company._count.deals} deals
+                {company._count.contacts} contacte / {company._count.deals} oportunități
               </span>
             </div>
           </Link>
         ))}
       </div>
+      {filteredCompanies.length === 0 && (
+        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          Nu există companii pentru filtrele selectate.
+        </div>
+      )}
     </div>
   )
 }

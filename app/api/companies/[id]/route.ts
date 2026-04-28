@@ -110,6 +110,17 @@ export async function PATCH(
       data: updateData,
     })
 
+    if (data.status !== undefined) {
+      await prisma.activity.create({
+        data: {
+          workspaceId: existingCompany.workspaceId,
+          userId: session.user.id,
+          type: 'COMPANY_STATUS_UPDATED',
+          description: `Status companie actualizat la ${data.status}`,
+        },
+      })
+    }
+
     return NextResponse.json({
       company: {
         ...company,
