@@ -13,7 +13,7 @@ const updateSubTaskSchema = z.object({
 // PATCH update a subtask
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; subtaskId: string } }
+  { params }: { params: Promise<{ id: string; subtaskId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -21,14 +21,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id, subtaskId } = await params
+
     const body = await request.json()
     const data = updateSubTaskSchema.parse(body)
 
     // Get subtask and check access through task
     const subtask = await prisma.subTask.findFirst({
       where: {
-        id: params.subtaskId,
-        taskId: params.id,
+        id: subtaskId,
+        taskId: id,
       },
       include: {
         task: {
@@ -83,7 +85,7 @@ export async function PATCH(
 
     // Update subtask
     const updatedSubtask = await prisma.subTask.update({
-      where: { id: params.subtaskId },
+      where: { id: subtaskId },
       data: updateData,
     })
 
@@ -114,7 +116,7 @@ export async function PATCH(
 // DELETE a subtask
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; subtaskId: string } }
+  { params }: { params: Promise<{ id: string; subtaskId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -122,11 +124,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id, subtaskId } = await params
+
     // Get subtask and check access through task
     const subtask = await prisma.subTask.findFirst({
       where: {
-        id: params.subtaskId,
-        taskId: params.id,
+        id: subtaskId,
+        taskId: id,
       },
       include: {
         task: {
@@ -162,7 +166,7 @@ export async function DELETE(
 
     // Delete subtask
     await prisma.subTask.delete({
-      where: { id: params.subtaskId },
+      where: { id: subtaskId },
     })
 
     return NextResponse.json({ success: true })

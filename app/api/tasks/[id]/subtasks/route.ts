@@ -18,7 +18,7 @@ const updateSubTaskSchema = z.object({
 // GET all subtasks for a task
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -26,10 +26,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -62,7 +64,7 @@ export async function GET(
     // Get all subtasks for this task, ordered by order field then by created_at
     const subtasks = await prisma.subTask.findMany({
       where: {
-        taskId: params.id,
+        taskId: id,
       },
       orderBy: [
         { order: 'asc' },
@@ -90,7 +92,7 @@ export async function GET(
 // POST create a new subtask
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -98,13 +100,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     const body = await request.json()
     const data = createSubTaskSchema.parse(body)
 
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -138,7 +142,7 @@ export async function POST(
     let order = data.order
     if (order === undefined) {
       const maxOrderSubtask = await prisma.subTask.findFirst({
-        where: { taskId: params.id },
+        where: { taskId: id },
         orderBy: { order: 'desc' },
       })
       order = maxOrderSubtask ? maxOrderSubtask.order + 1 : 0
@@ -147,7 +151,7 @@ export async function POST(
     // Create subtask
     const subtask = await prisma.subTask.create({
       data: {
-        taskId: params.id,
+        taskId: id,
         title: data.title.trim(),
         order,
       },

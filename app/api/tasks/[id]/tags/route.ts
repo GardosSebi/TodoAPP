@@ -11,7 +11,7 @@ const addTagSchema = z.object({
 // GET all tags for a task
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,10 +19,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -77,7 +79,7 @@ export async function GET(
 // POST add a tag to a task
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -85,13 +87,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     const body = await request.json()
     const data = addTagSchema.parse(body)
 
     // Get task and check workspace access
     const task = await prisma.task.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -140,7 +144,7 @@ export async function POST(
     const existingTaskTag = await prisma.taskTag.findUnique({
       where: {
         taskId_tagId: {
-          taskId: params.id,
+          taskId: id,
           tagId: data.tagId,
         },
       },
@@ -156,7 +160,7 @@ export async function POST(
     // Create TaskTag
     await prisma.taskTag.create({
       data: {
-        taskId: params.id,
+        taskId: id,
         tagId: data.tagId,
       },
     })

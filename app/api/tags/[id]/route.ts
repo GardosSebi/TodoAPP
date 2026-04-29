@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 // DELETE a tag
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,10 +14,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // Get tag and check workspace access
     const tag = await prisma.tag.findFirst({
       where: {
-        id: params.id,
+        id,
       },
       include: {
         workspace: {
@@ -48,7 +50,7 @@ export async function DELETE(
 
     // Delete tag (TaskTag entries will be deleted automatically due to cascade)
     await prisma.tag.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
