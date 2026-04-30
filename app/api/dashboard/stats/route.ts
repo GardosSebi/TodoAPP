@@ -264,7 +264,7 @@ export async function GET(request: NextRequest) {
     })
     const wonDeals = await prisma.deal.count({
       where: {
-        AND: [dealCountWhere, { stage: 'WON' }],
+        AND: [dealCountWhere, { stage: DealStage.WON }],
       },
     })
     const conversionRate = totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0
