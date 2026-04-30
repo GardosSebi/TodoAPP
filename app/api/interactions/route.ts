@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import type { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -42,15 +43,17 @@ export async function GET(request: NextRequest) {
     const workspaceIds = userWorkspaces.map((w) => w.id)
     if (workspaceIds.length === 0) return NextResponse.json({ interactions: [] })
 
-    const baseWhere = await crmNotesWhereForSession(session, workspaceIds)
-    if (!baseWhere) {
+    const baseWhereRaw = await crmNotesWhereForSession(session, workspaceIds)
+    if (!baseWhereRaw) {
       return NextResponse.json({ interactions: [] })
     }
-    const clauses: object[] = [baseWhere]
+    const baseWhere = baseWhereRaw as Prisma.InteractionWhereInput
+    const clauses: Prisma.InteractionWhereInput[] = [baseWhere]
     if (contactId) clauses.push({ contactId })
     if (companyId) clauses.push({ companyId })
     if (dealId) clauses.push({ dealId })
-    const where = clauses.length > 1 ? { AND: clauses } : baseWhere
+    const where: Prisma.InteractionWhereInput =
+      clauses.length > 1 ? { AND: clauses } : baseWhere
 
     const interactions = await prisma.interaction.findMany({
       where,

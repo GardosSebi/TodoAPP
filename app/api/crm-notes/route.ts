@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import type { Prisma } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -43,11 +44,12 @@ export async function GET(request: NextRequest) {
     if (!baseWhere) {
       return NextResponse.json({ notes: [] })
     }
-    const clauses: object[] = [baseWhere]
+    const clauses: Prisma.CRMNoteWhereInput[] = [baseWhere]
     if (contactId) clauses.push({ contactId })
     if (companyId) clauses.push({ companyId })
     if (dealId) clauses.push({ dealId })
-    const where = clauses.length > 1 ? { AND: clauses } : baseWhere
+    const where: Prisma.CRMNoteWhereInput =
+      clauses.length > 1 ? { AND: clauses } : baseWhere
 
     const notes = await prisma.cRMNote.findMany({
       where,
