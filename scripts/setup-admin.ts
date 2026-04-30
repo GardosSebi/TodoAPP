@@ -1,6 +1,9 @@
+import { loadEnvConfig } from '@next/env'
 import { PrismaClient } from '@prisma/client'
 import { hash } from 'phc-argon2'
 import * as readline from 'readline'
+
+loadEnvConfig(process.cwd())
 
 const prisma = new PrismaClient()
 
@@ -13,9 +16,25 @@ function question(query: string): Promise<string> {
   return new Promise((resolve) => rl.question(query, resolve))
 }
 
+function resolveAdminEmail(): Promise<string> {
+  const fromArg = process.argv[2]?.trim()
+  const fromEnv = process.env.ADMIN_SETUP_EMAIL?.trim()
+  if (fromArg) return Promise.resolve(fromArg)
+  if (fromEnv) return Promise.resolve(fromEnv)
+  return question('Admin email: ')
+}
+
 async function setupAdmin() {
   try {
-    const email = 'sebi.gardos@verticaldigital.ca'
+    const emailRaw = await resolveAdminEmail()
+    const email = emailRaw.trim().toLowerCase()
+    if (!email.includes('@')) {
+      console.error('Invalid email.')
+      rl.close()
+      await prisma.$disconnect()
+      process.exit(1)
+    }
+
     // Generate name from email (convert "sebi.gardos" to "Sebi Gardos")
     const nameFromEmail = email.split('@')[0]
       .split('.')
@@ -35,8 +54,11 @@ async function setupAdmin() {
           where: { email },
           data: { role: 'ADMIN' },
         })
+        console.log(`\nRole set to ADMIN for ${email}`)
+      } else {
+        console.log(`\nUser ${email} is already ADMIN.`)
       }
-      
+
       const update = await question('\nDo you want to update the password? (y/n): ')
       
       if (update.toLowerCase() === 'y') {
@@ -55,6 +77,7 @@ async function setupAdmin() {
             role: 'ADMIN',
           },
         })
+        console.log('Password updated.')
       }
     } else {
       const password = await question('Enter password for admin account (min 8 characters): ')
@@ -93,11 +116,13 @@ async function setupAdmin() {
           data: { userId: newUser.id },
         })
       })
+      console.log(`\nAdmin user created: ${email}`)
     }
 
     rl.close()
     await prisma.$disconnect()
   } catch (error) {
+    console.error(error)
     rl.close()
     await prisma.$disconnect()
     process.exit(1)

@@ -26,6 +26,8 @@ import {
   Users,
   Building2,
   Handshake,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -175,11 +177,14 @@ interface Project {
   }
 }
 
+const PROJECTS_SECTION_COLLAPSED_KEY = 'sidebar-projects-collapsed'
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { data: session } = useSession()
   const [projects, setProjects] = useState<Project[]>([])
+  const [projectsSectionCollapsed, setProjectsSectionCollapsed] = useState(false)
   const [showNewProject, setShowNewProject] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
@@ -212,6 +217,9 @@ export default function Sidebar() {
     } else {
       document.documentElement.classList.remove('dark')
     }
+    if (localStorage.getItem(PROJECTS_SECTION_COLLAPSED_KEY) === 'true') {
+      setProjectsSectionCollapsed(true)
+    }
   }, [])
 
   const fetchWorkspace = async () => {
@@ -236,6 +244,10 @@ export default function Sidebar() {
     }
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    localStorage.setItem(PROJECTS_SECTION_COLLAPSED_KEY, String(projectsSectionCollapsed))
+  }, [projectsSectionCollapsed])
 
   const fetchProjects = async () => {
     try {
@@ -544,19 +556,46 @@ export default function Sidebar() {
         )}
 
         <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Proiecte
-            </h2>
+          <div className="flex items-center justify-between mb-2 gap-2">
             <button
-              onClick={() => setShowNewProject(!showNewProject)}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              type="button"
+              onClick={() => {
+                setProjectsSectionCollapsed((c) => {
+                  if (!c) setShowNewProject(false)
+                  return !c
+                })
+              }}
+              className="flex items-center gap-2 min-w-0 flex-1 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-expanded={!projectsSectionCollapsed}
+              title={projectsSectionCollapsed ? 'Extinde proiectele' : 'Comprimă proiectele'}
             >
-              <PlusIcon className="w-4 h-4" />
+              {projectsSectionCollapsed ? (
+                <ChevronRight className="w-4 h-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+              )}
+              <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+                Proiecte
+              </h2>
+              {projectsSectionCollapsed && (
+                <span className="ml-auto shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 tabular-nums">
+                  {projects.length}
+                </span>
+              )}
             </button>
+            {!projectsSectionCollapsed && (
+              <button
+                type="button"
+                onClick={() => setShowNewProject(!showNewProject)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                title="Proiect nou"
+              >
+                <PlusIcon className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {showNewProject && (
+          {!projectsSectionCollapsed && showNewProject && (
             <motion.form
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -580,29 +619,31 @@ export default function Sidebar() {
             </motion.form>
           )}
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={projects.map((p) => p.id)}
-              strategy={verticalListSortingStrategy}
+          {!projectsSectionCollapsed && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              <div className="space-y-1">
-                {projects.map((project) => (
-                  <SortableProjectItem
-                    key={project.id}
-                    project={project}
-                    pathname={pathname}
-                    session={session}
-                    onDelete={handleDeleteProject}
-                    onMobileMenuClose={() => setIsMobileMenuOpen(false)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
+              <SortableContext
+                items={projects.map((p) => p.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1">
+                  {projects.map((project) => (
+                    <SortableProjectItem
+                      key={project.id}
+                      project={project}
+                      pathname={pathname}
+                      session={session}
+                      onDelete={handleDeleteProject}
+                      onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
         </div>
       </nav>
 

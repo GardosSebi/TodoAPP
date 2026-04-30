@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, isCrmAdmin } from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const createCompanySchema = z.object({
@@ -39,17 +40,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ companies: [] })
     }
 
-    const where: any = { workspaceId: { in: workspaceIds } }
-    if (status) where.status = status
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { website: { contains: search, mode: 'insensitive' } },
-        { industry: { contains: search, mode: 'insensitive' } },
-      ]
+    const clauses: Record<string, unknown>[] = [{ workspaceId: { in: workspaceIds } }]
+    if (!isCrmAdmin(session)) {
+      clauses.push(companyRowScope(session) as Record<string, unknown>)
     }
+    if (status) clauses.push({ status })
+    if (search) {
+      clauses.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { website: { contains: search, mode: 'insensitive' } },
+          { industry: { contains: search, mode: 'insensitive' } },
+        ],
+      })
+    }
+    const where = { AND: clauses }
 
-    const companies = await (prisma as any).company.findMany({
+    const companies = await prisma.company.findMany({
       where,
       include: {
         primaryContact: {
@@ -118,8 +125,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.primaryContactId) {
-      const contact = await (prisma as any).contact.findFirst({
-        where: { id: data.primaryContactId, workspaceId: targetWorkspaceId },
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: data.primaryContactId,
+          workspaceId: targetWorkspaceId,
+          ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
+        },
         select: { id: true },
       })
       if (!contact) {
@@ -127,7 +138,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const company = await (prisma as any).company.create({
+    const company = await prisma.company.create({
       data: {
         workspaceId: targetWorkspaceId,
         name: data.name.trim(),
@@ -138,6 +149,7 @@ export async function POST(request: NextRequest) {
         status: data.status || 'LEAD',
         notes: data.notes?.trim() || null,
         primaryContactId: data.primaryContactId || null,
+        created_by: session.user.id,
       },
     })
 

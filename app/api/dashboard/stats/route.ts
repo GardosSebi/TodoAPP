@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +26,16 @@ export async function GET(request: NextRequest) {
     })
 
     const workspaceIds = userWorkspaces.map((w) => w.id)
+
+    const contactCountWhere = isCrmAdmin(session)
+      ? { workspaceId: { in: workspaceIds } }
+      : { AND: [{ workspaceId: { in: workspaceIds } }, contactRowScope(session)] }
+    const companyCountWhere = isCrmAdmin(session)
+      ? { workspaceId: { in: workspaceIds } }
+      : { AND: [{ workspaceId: { in: workspaceIds } }, companyRowScope(session)] }
+    const dealCountWhere = isCrmAdmin(session)
+      ? { workspaceId: { in: workspaceIds } }
+      : { AND: [{ workspaceId: { in: workspaceIds } }, dealRowScope(session)] }
 
     if (workspaceIds.length === 0) {
       return NextResponse.json({
@@ -226,23 +237,27 @@ export async function GET(request: NextRequest) {
     const completionRate = totalTasks > 0 ? Math.round((completedTasksTotal / totalTasks) * 100) : 0
 
     // 5. CRM Statistics
-    const totalContacts = await (prisma as any).contact.count({
-      where: { workspaceId: { in: workspaceIds } },
+    const totalContacts = await prisma.contact.count({
+      where: contactCountWhere,
     })
-    const totalCompanies = await (prisma as any).company.count({
-      where: { workspaceId: { in: workspaceIds } },
+    const totalCompanies = await prisma.company.count({
+      where: companyCountWhere,
     })
-    const totalDeals = await (prisma as any).deal.count({
-      where: { workspaceId: { in: workspaceIds } },
+    const totalDeals = await prisma.deal.count({
+      where: dealCountWhere,
     })
-    const activeDeals = await (prisma as any).deal.count({
+    const activeDeals = await prisma.deal.count({
       where: {
-        workspaceId: { in: workspaceIds },
-        stage: { in: ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION'] },
+        AND: [
+          dealCountWhere,
+          { stage: { in: ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION'] } },
+        ],
       },
     })
-    const wonDeals = await (prisma as any).deal.count({
-      where: { workspaceId: { in: workspaceIds }, stage: 'WON' },
+    const wonDeals = await prisma.deal.count({
+      where: {
+        AND: [dealCountWhere, { stage: 'WON' }],
+      },
     })
     const conversionRate = totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0
 
@@ -268,9 +283,9 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const dealsByStageRaw = await (prisma as any).deal.groupBy({
+    const dealsByStageRaw = await prisma.deal.groupBy({
       by: ['stage'],
-      where: { workspaceId: { in: workspaceIds } },
+      where: dealCountWhere,
       _count: { stage: true },
       _sum: { value: true },
     })

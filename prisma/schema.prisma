@@ -81,8 +81,12 @@ model User {
   filterPresets            FilterPreset[]
   notifications            Notification[]
   taskTemplates            TaskTemplate[]
-  createdContacts          Contact[]
-  ownedDeals               Deal[]
+  createdContacts          Contact[]             @relation("ContactCreatedBy")
+  assignedContacts         Contact[]             @relation("ContactAssignee")
+  createdCompanies         Company[]             @relation("CompanyCreatedBy")
+  assignedCompanies        Company[]             @relation("CompanyAssignee")
+  createdDeals             Deal[]                @relation("DealCreator")
+  ownedDeals               Deal[]                @relation("DealOwner")
   crmNotes                 CRMNote[]
   interactions             Interaction[]
 
@@ -255,6 +259,8 @@ model Company {
   status           CompanyStatus @default(LEAD)
   notes            String?       @db.Text
   primaryContactId String?
+  created_by       String?
+  assigned_to      String?
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
   workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -262,6 +268,8 @@ model Company {
   deals            Deal[]
   tasks            Task[]
   primaryContact   Contact?      @relation("CompanyPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  creator          User?         @relation("CompanyCreatedBy", fields: [created_by], references: [id], onDelete: SetNull)
+  assignee         User?         @relation("CompanyAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
   crmNotes         CRMNote[]
   interactions     Interaction[]
 
@@ -270,6 +278,8 @@ model Company {
   @@index([status])
   @@index([name])
   @@index([primaryContactId])
+  @@index([created_by])
+  @@index([assigned_to])
 }
 
 model Contact {
@@ -293,7 +303,9 @@ model Contact {
   deals             Deal[]
   crmNotes          CRMNote[]
   interactions      Interaction[]
-  createdBy         User?         @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  assigned_to       String?
+  createdBy         User?         @relation("ContactCreatedBy", fields: [created_by], references: [id], onDelete: SetNull)
+  assignee          User?         @relation("ContactAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
   primaryForCompany Company[]     @relation("CompanyPrimaryContact")
 
   @@unique([workspaceId, email])
@@ -301,6 +313,8 @@ model Contact {
   @@index([companyId])
   @@index([status])
   @@index([last_name])
+  @@index([created_by])
+  @@index([assigned_to])
 }
 
 model Deal {
@@ -314,12 +328,14 @@ model Deal {
   value          Float         @default(0)
   expected_close DateTime?
   ownerId        String?
+  created_by     String?
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
   workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   company        Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  owner          User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  owner          User?         @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  creator        User?         @relation("DealCreator", fields: [created_by], references: [id], onDelete: SetNull)
   tasks          Task[]
   crmNotes       CRMNote[]
   interactions   Interaction[]
@@ -330,6 +346,7 @@ model Deal {
   @@index([stage])
   @@index([expected_close])
   @@index([ownerId])
+  @@index([created_by])
 }
 
 model CRMNote {

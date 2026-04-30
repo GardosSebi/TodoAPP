@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const createDealSchema = z.object({
@@ -40,14 +41,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ deals: [] })
     }
 
-    const where: any = { workspaceId: { in: workspaceIds } }
-    if (stage) where.stage = stage
-    if (companyId) where.companyId = companyId
-    if (search) {
-      where.OR = [{ title: { contains: search, mode: 'insensitive' } }, { description: { contains: search, mode: 'insensitive' } }]
+    const clauses: Record<string, unknown>[] = [{ workspaceId: { in: workspaceIds } }]
+    if (!isCrmAdmin(session)) {
+      clauses.push(dealRowScope(session) as Record<string, unknown>)
     }
+    if (stage) clauses.push({ stage })
+    if (companyId) clauses.push({ companyId })
+    if (search) {
+      clauses.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      })
+    }
+    const where = { AND: clauses }
 
-    const deals = await (prisma as any).deal.findMany({
+    const deals = await prisma.deal.findMany({
       where,
       include: {
         company: {
@@ -111,8 +121,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.companyId) {
-      const company = await (prisma as any).company.findFirst({
-        where: { id: data.companyId, workspaceId: targetWorkspaceId },
+      const company = await prisma.company.findFirst({
+        where: {
+          id: data.companyId,
+          workspaceId: targetWorkspaceId,
+          ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
+        },
         select: { id: true },
       })
       if (!company) {
@@ -121,8 +135,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.contactId) {
-      const contact = await (prisma as any).contact.findFirst({
-        where: { id: data.contactId, workspaceId: targetWorkspaceId },
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: data.contactId,
+          workspaceId: targetWorkspaceId,
+          ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
+        },
         select: { id: true },
       })
       if (!contact) {
@@ -130,7 +148,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (data.ownerId) {
+    const effectiveOwnerId = isCrmAdmin(session)
+      ? data.ownerId ?? session.user.id
+      : session.user.id
+
+    if (isCrmAdmin(session) && data.ownerId) {
       const workspaceOwnerOrMember = await prisma.workspace.findFirst({
         where: {
           id: targetWorkspaceId,
@@ -143,7 +165,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const deal = await (prisma as any).deal.create({
+    const deal = await prisma.deal.create({
       data: {
         workspaceId: targetWorkspaceId,
         companyId: data.companyId || null,
@@ -153,7 +175,8 @@ export async function POST(request: NextRequest) {
         stage: data.stage || 'NEW',
         value: data.value ?? 0,
         expected_close: data.expected_close ? new Date(data.expected_close) : null,
-        ownerId: data.ownerId || session.user.id,
+        ownerId: effectiveOwnerId,
+        created_by: session.user.id,
       },
     })
 

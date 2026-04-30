@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const updateDealSchema = z.object({
@@ -23,12 +24,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const deal = await (prisma as any).deal.findFirst({
+    const deal = await prisma.deal.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : dealRowScope(session)),
       },
       include: {
         company: true,
@@ -71,12 +73,13 @@ export async function PATCH(
     const body = await request.json()
     const data = updateDealSchema.parse(body)
 
-    const existingDeal = await (prisma as any).deal.findFirst({
+    const existingDeal = await prisma.deal.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : dealRowScope(session)),
       },
       select: {
         workspaceId: true,
@@ -88,8 +91,12 @@ export async function PATCH(
     }
 
     if (data.companyId) {
-      const company = await (prisma as any).company.findFirst({
-        where: { id: data.companyId, workspaceId: existingDeal.workspaceId },
+      const company = await prisma.company.findFirst({
+        where: {
+          id: data.companyId,
+          workspaceId: existingDeal.workspaceId,
+          ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
+        },
         select: { id: true },
       })
       if (!company) {
@@ -98,8 +105,12 @@ export async function PATCH(
     }
 
     if (data.contactId) {
-      const contact = await (prisma as any).contact.findFirst({
-        where: { id: data.contactId, workspaceId: existingDeal.workspaceId },
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: data.contactId,
+          workspaceId: existingDeal.workspaceId,
+          ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
+        },
         select: { id: true },
       })
       if (!contact) {
@@ -107,7 +118,7 @@ export async function PATCH(
       }
     }
 
-    if (data.ownerId) {
+    if (isCrmAdmin(session) && data.ownerId) {
       const workspaceOwnerOrMember = await prisma.workspace.findFirst({
         where: {
           id: existingDeal.workspaceId,
@@ -120,7 +131,7 @@ export async function PATCH(
       }
     }
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (data.companyId !== undefined) updateData.companyId = data.companyId || null
     if (data.contactId !== undefined) updateData.contactId = data.contactId || null
     if (data.title !== undefined) updateData.title = data.title.trim()
@@ -130,9 +141,11 @@ export async function PATCH(
     if (data.expected_close !== undefined) {
       updateData.expected_close = data.expected_close ? new Date(data.expected_close) : null
     }
-    if (data.ownerId !== undefined) updateData.ownerId = data.ownerId || null
+    if (data.ownerId !== undefined) {
+      updateData.ownerId = isCrmAdmin(session) ? data.ownerId || null : session.user.id
+    }
 
-    const deal = await (prisma as any).deal.update({
+    const deal = await prisma.deal.update({
       where: { id },
       data: updateData,
     })
@@ -175,12 +188,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const deal = await (prisma as any).deal.findFirst({
+    const deal = await prisma.deal.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : dealRowScope(session)),
       },
       select: { id: true },
     })
@@ -189,7 +203,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Deal not found or access denied' }, { status: 404 })
     }
 
-    await (prisma as any).deal.delete({ where: { id } })
+    await prisma.deal.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

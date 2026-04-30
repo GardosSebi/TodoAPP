@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, isCrmAdmin } from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const updateContactSchema = z.object({
@@ -24,12 +25,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const contact = await (prisma as any).contact.findFirst({
+    const contact = await prisma.contact.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
       },
       include: {
         company: true,
@@ -74,12 +76,13 @@ export async function PATCH(
     const body = await request.json()
     const data = updateContactSchema.parse(body)
 
-    const existingContact = await (prisma as any).contact.findFirst({
+    const existingContact = await prisma.contact.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
       },
       select: {
         id: true,
@@ -92,10 +95,11 @@ export async function PATCH(
     }
 
     if (data.companyId) {
-      const company = await (prisma as any).company.findFirst({
+      const company = await prisma.company.findFirst({
         where: {
           id: data.companyId,
           workspaceId: existingContact.workspaceId,
+          ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
         },
         select: { id: true },
       })
@@ -115,7 +119,7 @@ export async function PATCH(
     if (data.tags !== undefined) updateData.tags = data.tags
     if (data.notes !== undefined) updateData.notes = data.notes?.trim() || null
 
-    const contact = await (prisma as any).contact.update({
+    const contact = await prisma.contact.update({
       where: { id },
       data: updateData,
     })
@@ -157,12 +161,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const contact = await (prisma as any).contact.findFirst({
+    const contact = await prisma.contact.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
       },
       select: { id: true },
     })
@@ -171,7 +176,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Contact not found or access denied' }, { status: 404 })
     }
 
-    await (prisma as any).contact.delete({ where: { id } })
+    await prisma.contact.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

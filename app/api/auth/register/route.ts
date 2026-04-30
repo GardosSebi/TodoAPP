@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'phc-argon2'
 import { z } from 'zod'
@@ -13,7 +14,7 @@ const registerSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, name, password } = registerSchema.parse(body)
+    const { email, name, password, role } = registerSchema.parse(body)
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
           email,
           name: name.trim(),
           password_hash,
-          role: body.role || 'USER',
+          role,
           workspaceId: workspace.id,
         },
         select: {
@@ -74,7 +75,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Error('Registration error:', error)
+    console.error('[api/auth/register]', error)
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return NextResponse.json(
+        { error: 'User already exists' },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

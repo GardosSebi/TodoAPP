@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import {
+  companyRowScope,
+  contactRowScope,
+  crmNotesWhereForSession,
+  dealRowScope,
+  isCrmAdmin,
+} from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const createCrmNoteSchema = z.object({
@@ -32,12 +39,17 @@ export async function GET(request: NextRequest) {
     const workspaceIds = userWorkspaces.map((w) => w.id)
     if (workspaceIds.length === 0) return NextResponse.json({ notes: [] })
 
-    const where: any = { workspaceId: { in: workspaceIds } }
-    if (contactId) where.contactId = contactId
-    if (companyId) where.companyId = companyId
-    if (dealId) where.dealId = dealId
+    const baseWhere = await crmNotesWhereForSession(session, workspaceIds)
+    if (!baseWhere) {
+      return NextResponse.json({ notes: [] })
+    }
+    const clauses: object[] = [baseWhere]
+    if (contactId) clauses.push({ contactId })
+    if (companyId) clauses.push({ companyId })
+    if (dealId) clauses.push({ dealId })
+    const where = clauses.length > 1 ? { AND: clauses } : baseWhere
 
-    const notes = await (prisma as any).cRMNote.findMany({
+    const notes = await prisma.cRMNote.findMany({
       where,
       include: {
         author: { select: { id: true, name: true, email: true } },
@@ -76,7 +88,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
     }
 
-    const note = await (prisma as any).cRMNote.create({
+    if (data.contactId) {
+      const ok = await prisma.contact.findFirst({
+        where: {
+          id: data.contactId,
+          workspaceId: user.workspaceId,
+          ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
+        },
+        select: { id: true },
+      })
+      if (!ok) {
+        return NextResponse.json({ error: 'Contact not found or access denied' }, { status: 403 })
+      }
+    }
+    if (data.companyId) {
+      const ok = await prisma.company.findFirst({
+        where: {
+          id: data.companyId,
+          workspaceId: user.workspaceId,
+          ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
+        },
+        select: { id: true },
+      })
+      if (!ok) {
+        return NextResponse.json({ error: 'Company not found or access denied' }, { status: 403 })
+      }
+    }
+    if (data.dealId) {
+      const ok = await prisma.deal.findFirst({
+        where: {
+          id: data.dealId,
+          workspaceId: user.workspaceId,
+          ...(isCrmAdmin(session) ? {} : dealRowScope(session)),
+        },
+        select: { id: true },
+      })
+      if (!ok) {
+        return NextResponse.json({ error: 'Deal not found or access denied' }, { status: 403 })
+      }
+    }
+
+    const note = await prisma.cRMNote.create({
       data: {
         workspaceId: user.workspaceId,
         authorId: session.user.id,

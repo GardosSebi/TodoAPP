@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, isCrmAdmin } from '@/lib/crmAccess'
 import { z } from 'zod'
 
 const updateCompanySchema = z.object({
@@ -23,15 +24,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const company = await (prisma as any).company.findFirst({
+    const company = await prisma.company.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
       },
       include: {
         contacts: {
+          where: isCrmAdmin(session) ? {} : contactRowScope(session),
           orderBy: [{ last_name: 'asc' }, { first_name: 'asc' }],
         },
         deals: {
@@ -71,12 +74,13 @@ export async function PATCH(
     const body = await request.json()
     const data = updateCompanySchema.parse(body)
 
-    const existingCompany = await (prisma as any).company.findFirst({
+    const existingCompany = await prisma.company.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
       },
       select: { workspaceId: true },
     })
@@ -86,8 +90,12 @@ export async function PATCH(
     }
 
     if (data.primaryContactId) {
-      const contact = await (prisma as any).contact.findFirst({
-        where: { id: data.primaryContactId, workspaceId: existingCompany.workspaceId },
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: data.primaryContactId,
+          workspaceId: existingCompany.workspaceId,
+          ...(isCrmAdmin(session) ? {} : contactRowScope(session)),
+        },
         select: { id: true },
       })
       if (!contact) {
@@ -105,7 +113,7 @@ export async function PATCH(
     if (data.notes !== undefined) updateData.notes = data.notes?.trim() || null
     if (data.primaryContactId !== undefined) updateData.primaryContactId = data.primaryContactId || null
 
-    const company = await (prisma as any).company.update({
+    const company = await prisma.company.update({
       where: { id },
       data: updateData,
     })
@@ -147,12 +155,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const company = await (prisma as any).company.findFirst({
+    const company = await prisma.company.findFirst({
       where: {
         id,
         workspace: {
           OR: [{ userId: session.user.id }, { members: { some: { userId: session.user.id } } }],
         },
+        ...(isCrmAdmin(session) ? {} : companyRowScope(session)),
       },
       select: { id: true },
     })
@@ -161,7 +170,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Company not found or access denied' }, { status: 404 })
     }
 
-    await (prisma as any).company.delete({ where: { id } })
+    await prisma.company.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

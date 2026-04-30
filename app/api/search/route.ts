@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
 
 export async function GET(request: NextRequest) {
   try {
@@ -123,15 +124,21 @@ export async function GET(request: NextRequest) {
 
     // Search contacts
     if (type === 'all' || type === 'contacts') {
-      const contacts = await (prisma as any).contact.findMany({
-        where: {
-          workspaceId: { in: workspaceIds },
+      const contactClauses: object[] = [
+        { workspaceId: { in: workspaceIds } },
+        {
           OR: [
             { first_name: { contains: query, mode: 'insensitive' } },
             { last_name: { contains: query, mode: 'insensitive' } },
             { email: { contains: query, mode: 'insensitive' } },
           ],
         },
+      ]
+      if (!isCrmAdmin(session)) {
+        contactClauses.push(contactRowScope(session))
+      }
+      const contacts = await prisma.contact.findMany({
+        where: { AND: contactClauses },
         include: {
           company: {
             select: { id: true, name: true },
@@ -150,15 +157,21 @@ export async function GET(request: NextRequest) {
 
     // Search companies
     if (type === 'all' || type === 'companies') {
-      const companies = await (prisma as any).company.findMany({
-        where: {
-          workspaceId: { in: workspaceIds },
+      const companyClauses: object[] = [
+        { workspaceId: { in: workspaceIds } },
+        {
           OR: [
             { name: { contains: query, mode: 'insensitive' } },
             { website: { contains: query, mode: 'insensitive' } },
             { industry: { contains: query, mode: 'insensitive' } },
           ],
         },
+      ]
+      if (!isCrmAdmin(session)) {
+        companyClauses.push(companyRowScope(session))
+      }
+      const companies = await prisma.company.findMany({
+        where: { AND: companyClauses },
         take: 30,
         orderBy: [{ updated_at: 'desc' }],
       })
@@ -172,14 +185,20 @@ export async function GET(request: NextRequest) {
 
     // Search deals
     if (type === 'all' || type === 'deals') {
-      const deals = await (prisma as any).deal.findMany({
-        where: {
-          workspaceId: { in: workspaceIds },
+      const dealClauses: object[] = [
+        { workspaceId: { in: workspaceIds } },
+        {
           OR: [
             { title: { contains: query, mode: 'insensitive' } },
             { description: { contains: query, mode: 'insensitive' } },
           ],
         },
+      ]
+      if (!isCrmAdmin(session)) {
+        dealClauses.push(dealRowScope(session))
+      }
+      const deals = await prisma.deal.findMany({
+        where: { AND: dealClauses },
         include: {
           company: {
             select: { id: true, name: true },
