@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { DealStage } from '@prisma/client'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
+
+const ACTIVE_PIPELINE_STAGES: DealStage[] = [
+  DealStage.NEW,
+  DealStage.QUALIFIED,
+  DealStage.PROPOSAL,
+  DealStage.NEGOTIATION,
+]
 
 export async function GET(request: NextRequest) {
   try {
@@ -250,7 +258,7 @@ export async function GET(request: NextRequest) {
       where: {
         AND: [
           dealCountWhere,
-          { stage: { in: ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION'] } },
+          { stage: { in: ACTIVE_PIPELINE_STAGES } },
         ],
       },
     })
