@@ -33,7 +33,7 @@ export default function TeamManagement() {
         const data = await res.json()
         setTeamMembers(data.teamMembers || [])
       }
-    } catch (error) {
+    } catch {
       // Error fetching team members
     }
   }
@@ -63,7 +63,7 @@ export default function TeamManagement() {
         setError(errorData.error || 'Failed to add team member')
         setSuccess('')
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred')
     } finally {
       setLoading(false)
@@ -83,7 +83,7 @@ export default function TeamManagement() {
       if (res.ok) {
         setTeamMembers((prev) => prev.filter((m) => m.id !== memberId))
       }
-    } catch (error) {
+    } catch {
       // Error removing team member
     }
   }

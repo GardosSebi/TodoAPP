@@ -37,7 +37,7 @@ export default function WorkspaceMembers() {
         const data = await res.json()
         setIsOwner(data.workspace.isOwner || false)
       }
-    } catch (error) {
+    } catch {
       // Error checking ownership
     }
   }
@@ -49,7 +49,7 @@ export default function WorkspaceMembers() {
         const data = await res.json()
         setMembers(data.members || [])
       }
-    } catch (error) {
+    } catch {
       // Error fetching workspace members
     }
   }
@@ -77,7 +77,7 @@ export default function WorkspaceMembers() {
         setError(errorData.error || 'Failed to invite member')
         setSuccess('')
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred')
     } finally {
       setLoading(false)
@@ -99,7 +99,7 @@ export default function WorkspaceMembers() {
       } else {
         alert('Eroare la eliminarea membrului')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la eliminarea membrului')
     }
   }

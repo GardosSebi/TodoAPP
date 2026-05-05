@@ -10,6 +10,8 @@ import {
   dealRowScope,
   isCrmAdmin,
 } from '@/lib/crmAccess'
+import { broadcastWorkspaceEmail } from '@/lib/workspaceEmail'
+import { createCrmNoteAddedEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const createCrmNoteSchema = z.object({
@@ -144,6 +146,53 @@ export async function POST(request: NextRequest) {
         author: { select: { id: true, name: true, email: true } },
       },
     })
+
+    if (data.contactId || data.companyId || data.dealId) {
+      let contextLabel = 'CRM'
+      let resourceLink = '/app/crm/contacts'
+      if (data.contactId) {
+        const c = await prisma.contact.findFirst({
+          where: { id: data.contactId, workspaceId: user.workspaceId },
+          select: { first_name: true, last_name: true },
+        })
+        if (c) {
+          contextLabel = `Contact: ${c.first_name} ${c.last_name}`.trim()
+          resourceLink = `/app/crm/contacts/${data.contactId}`
+        }
+      } else if (data.companyId) {
+        const co = await prisma.company.findFirst({
+          where: { id: data.companyId, workspaceId: user.workspaceId },
+          select: { name: true },
+        })
+        if (co) {
+          contextLabel = `Companie: ${co.name}`
+          resourceLink = `/app/crm/companies/${data.companyId}`
+        }
+      } else if (data.dealId) {
+        const d = await prisma.deal.findFirst({
+          where: { id: data.dealId, workspaceId: user.workspaceId },
+          select: { title: true },
+        })
+        if (d) {
+          contextLabel = `Oportunitate: ${d.title}`
+          resourceLink = `/app/crm/deals/${data.dealId}`
+        }
+      }
+      const authorName = note.author.name || note.author.email || 'Cineva'
+      await broadcastWorkspaceEmail(
+        user.workspaceId,
+        session.user.id,
+        'crmNoteAddedEmail',
+        (recipientName) =>
+          createCrmNoteAddedEmail(
+            recipientName,
+            authorName,
+            contextLabel,
+            data.content.trim(),
+            resourceLink
+          )
+      )
+    }
 
     return NextResponse.json(
       {

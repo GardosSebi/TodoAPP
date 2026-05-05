@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { companyRowScope, contactRowScope, isCrmAdmin } from '@/lib/crmAccess'
+import { broadcastWorkspaceEmail } from '@/lib/workspaceEmail'
+import { createNewContactEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const createContactSchema = z.object({
@@ -151,6 +153,16 @@ export async function POST(request: NextRequest) {
         created_by: session.user.id,
       },
     })
+
+    const displayName = `${contact.first_name} ${contact.last_name}`.trim()
+    const actorName = session.user.name || session.user.email || 'Cineva'
+    await broadcastWorkspaceEmail(
+      targetWorkspaceId,
+      session.user.id,
+      'newContactEmail',
+      (recipientName) =>
+        createNewContactEmail(recipientName, actorName, displayName, `/app/crm/contacts/${contact.id}`)
+    )
 
     return NextResponse.json(
       {

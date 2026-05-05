@@ -5,7 +5,7 @@ import * as readline from 'readline'
 
 loadEnvConfig(process.cwd())
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({ log: [] })
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -29,7 +29,7 @@ async function setupAdmin() {
     const emailRaw = await resolveAdminEmail()
     const email = emailRaw.trim().toLowerCase()
     if (!email.includes('@')) {
-      console.error('Invalid email.')
+      process.stderr.write('Invalid email.\n')
       rl.close()
       await prisma.$disconnect()
       process.exit(1)
@@ -54,9 +54,9 @@ async function setupAdmin() {
           where: { email },
           data: { role: 'ADMIN' },
         })
-        console.log(`\nRole set to ADMIN for ${email}`)
+        process.stdout.write(`\nRole set to ADMIN for ${email}\n`)
       } else {
-        console.log(`\nUser ${email} is already ADMIN.`)
+        process.stdout.write(`\nUser ${email} is already ADMIN.\n`)
       }
 
       const update = await question('\nDo you want to update the password? (y/n): ')
@@ -77,7 +77,7 @@ async function setupAdmin() {
             role: 'ADMIN',
           },
         })
-        console.log('Password updated.')
+        process.stdout.write('Password updated.\n')
       }
     } else {
       const password = await question('Enter password for admin account (min 8 characters): ')
@@ -116,13 +116,13 @@ async function setupAdmin() {
           data: { userId: newUser.id },
         })
       })
-      console.log(`\nAdmin user created: ${email}`)
+      process.stdout.write(`\nAdmin user created: ${email}\n`)
     }
 
     rl.close()
     await prisma.$disconnect()
   } catch (error) {
-    console.error(error)
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     rl.close()
     await prisma.$disconnect()
     process.exit(1)

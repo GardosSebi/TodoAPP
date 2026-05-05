@@ -37,6 +37,20 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
+      const hintRes = await fetch('/api/auth/pending-login-hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      })
+      const hint = await hintRes.json().catch(() => ({}))
+      if (hint.code === 'EMAIL_NOT_VERIFIED') {
+        setError(
+          'Contul nu este încă activat. Deschide linkul din emailul de confirmare, apoi încearcă din nou să te conectezi.'
+        )
+        setLoading(false)
+        return
+      }
+
       const result = await signIn('credentials', {
         email,
         password,
@@ -137,6 +151,15 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Forgot password?
+            </Link>
           </div>
 
           <div>

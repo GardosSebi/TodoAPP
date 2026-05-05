@@ -122,7 +122,7 @@ export default function TaskDetailsModal({
         const data = await dealsRes.json()
         setDeals(data.deals || [])
       }
-    } catch (error) {
+    } catch {
       // Error fetching CRM options
     }
   }
@@ -140,7 +140,7 @@ export default function TaskDetailsModal({
       setReminderDate(
         currentTask.reminder_at ? new Date(currentTask.reminder_at).toISOString().split('T')[0] : ''
       )
-    } catch (error) {
+    } catch {
       // Error fetching task CRM details
     }
   }
@@ -220,7 +220,7 @@ export default function TaskDetailsModal({
           setWorkspaceMembers(allMembers)
         }
       }
-    } catch (error) {
+    } catch {
       // Error fetching workspace members
     }
   }
@@ -254,7 +254,7 @@ export default function TaskDetailsModal({
       
       // Use the isOwner flag from the task's workspace
       setIsWorkspaceOwner(taskWorkspace.isOwner || false)
-    } catch (error) {
+    } catch {
       // Error checking workspace ownership
     }
   }
@@ -273,7 +273,7 @@ export default function TaskDetailsModal({
         }
         // Keep files from task prop as fallback
       }
-    } catch (error) {
+    } catch {
       // Error fetching files
       // If error, just use files from task prop
       setFiles(task.files || [])
@@ -290,7 +290,7 @@ export default function TaskDetailsModal({
         // If endpoint returns error, just use subtasks from task prop
         setSubtasks(task.subtasks || [])
       }
-    } catch (error) {
+    } catch {
       // Error fetching subtasks
       setSubtasks(task.subtasks || [])
     }
@@ -319,7 +319,7 @@ export default function TaskDetailsModal({
         const error = await res.json()
         alert(error.error || 'Eroare la adăugarea subsarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la adăugarea subsarcinii')
     } finally {
       setIsAddingSubtask(false)
@@ -344,7 +344,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la actualizarea subsarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la actualizarea subsarcinii')
     }
   }
@@ -362,7 +362,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la ștergerea subsarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la ștergerea subsarcinii')
     }
   }
@@ -387,7 +387,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la actualizarea subsarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la actualizarea subsarcinii')
     }
   }
@@ -406,7 +406,7 @@ export default function TaskDetailsModal({
       } else {
         setTags(task.tags || [])
       }
-    } catch (error) {
+    } catch {
       setTags(task.tags || [])
     }
   }
@@ -418,7 +418,7 @@ export default function TaskDetailsModal({
         const data = await res.json()
         setAvailableTags(data.tags || [])
       }
-    } catch (error) {
+    } catch {
       // Error fetching available tags
     }
   }
@@ -450,7 +450,7 @@ export default function TaskDetailsModal({
         const error = await res.json()
         alert(error.error || 'Eroare la crearea etichetei')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la crearea etichetei')
     } finally {
       setIsCreatingTag(false)
@@ -478,7 +478,7 @@ export default function TaskDetailsModal({
           alert(error.error || 'Eroare la adăugarea etichetei')
         }
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la adăugarea etichetei')
     }
   }
@@ -494,7 +494,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la eliminarea etichetei')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la eliminarea etichetei')
     }
   }
@@ -513,7 +513,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la ștergerea etichetei')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la ștergerea etichetei')
     }
   }
@@ -543,7 +543,7 @@ export default function TaskDetailsModal({
         const error = await res.json()
         alert(error.error || 'Eroare la încărcarea fișierului')
       }
-    } catch (error) {
+    } catch {
       // Error uploading file
       alert('Eroare la încărcarea fișierului')
     } finally {
@@ -565,7 +565,7 @@ export default function TaskDetailsModal({
       } else {
         alert('Eroare la ștergerea fișierului')
       }
-    } catch (error) {
+    } catch {
       // Error deleting file
       alert('Eroare la ștergerea fișierului')
     }
@@ -600,7 +600,7 @@ export default function TaskDetailsModal({
       }
       await onUpdate(task.id, updates)
       onClose()
-    } catch (error) {
+    } catch {
       // Error saving task
     } finally {
       setIsSaving(false)
@@ -626,7 +626,7 @@ export default function TaskDetailsModal({
       if (res.ok) {
         const data = await res.json()
         setArchived(data.task.archived)
-        await onUpdate(task.id, { archived: data.task.archived } as any)
+        await onUpdate(task.id, { archived: data.task.archived })
         if (data.task.archived) {
           onClose() // Close modal if task is archived
         }
@@ -634,7 +634,7 @@ export default function TaskDetailsModal({
         const error = await res.json()
         alert(error.error || 'Eroare la arhivarea sarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la arhivarea sarcinii')
     } finally {
       setIsArchiving(false)
@@ -654,16 +654,14 @@ export default function TaskDetailsModal({
       })
 
       if (res.ok) {
-        const data = await res.json()
-        // Close modal and refresh - the new task will appear in the list
+        await res.json()
         onClose()
-        // Optionally reload the page or trigger a refresh
         window.location.reload()
       } else {
         const error = await res.json()
         alert(error.error || 'Eroare la duplicarea sarcinii')
       }
-    } catch (error) {
+    } catch {
       alert('Eroare la duplicarea sarcinii')
     } finally {
       setIsDuplicating(false)
@@ -1093,6 +1091,8 @@ export default function TaskDetailsModal({
                         >
                           {isImage(file.mimeType) ? (
                             <div className="flex-shrink-0 w-16 h-16 rounded overflow-hidden border border-gray-200 dark:border-gray-600">
+                              {/* Thumbnails use dynamic API paths; next/image needs host config */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={file.filePath}
                                 alt={file.fileName}

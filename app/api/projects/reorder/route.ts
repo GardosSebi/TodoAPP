@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.error('Error reordering projects:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

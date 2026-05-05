@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, createTaskOverdueEmail } from '@/lib/email'
+import { getEmailNotificationSettings, shouldDeferEmailForQuietHours } from '@/lib/emailNotificationSettings'
+import { formatTaskCrmLine, resolveResponsibleUser } from '@/lib/taskResponsibleUser'
 
-// This endpoint checks for overdue tasks and sends notifications to responsible users
-// Should be called periodically (e.g., via cron job or scheduled task)
 export async function POST(request: NextRequest) {
   try {
-    // Optional: Add authentication/authorization check for cron job
     const authHeader = request.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
-    
+
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -17,8 +16,6 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
 
-    // Find all tasks with due_at in the past
-    // Exclude completed tasks and archived tasks
     const tasks = await prisma.task.findMany({
       where: {
         archived: false,
@@ -28,11 +25,15 @@ export async function POST(request: NextRequest) {
         status: {
           not: 'COMPLETED',
         },
-        responsible: {
-          not: null,
-        },
       },
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         workspace: {
           include: {
             members: {
@@ -61,28 +62,36 @@ export async function POST(request: NextRequest) {
             name: true,
           },
         },
+        contact: {
+          select: { first_name: true, last_name: true },
+        },
+        company: {
+          select: { name: true },
+        },
       },
     })
 
     let notificationsCreated = 0
     let emailsSent = 0
+    let skippedByPreference = 0
 
     for (const task of tasks) {
-      if (!task.responsible || !task.due_at) continue
+      if (!task.due_at) continue
 
-      // Find the responsible user by name in workspace members or owner
       const responsibleUser =
-        task.workspace.members.find((m) => m.user.name === task.responsible)?.user ||
-        (task.workspace.user?.name === task.responsible ? task.workspace.user : null)
+        resolveResponsibleUser(task.responsible, task.workspace) ?? task.user
+      if (!responsibleUser?.email) continue
 
-      if (!responsibleUser) continue
+      const settings = await getEmailNotificationSettings(responsibleUser.id)
+      if (!settings.overdueTaskEmail) {
+        skippedByPreference++
+        continue
+      }
 
-      // Calculate days overdue
       const dueDate = new Date(task.due_at)
       dueDate.setHours(0, 0, 0, 0)
       const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
 
-      // Check if notification already exists for this task and user in the last 24 hours
       const oneDayAgo = new Date(now)
       oneDayAgo.setDate(oneDayAgo.getDate() - 1)
 
@@ -99,22 +108,20 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Skip if notification already sent in last 24 hours
       if (existingNotification) continue
 
-      // Create task link
       const taskLink = task.projectId
         ? `/app/project/${task.projectId}?task=${task.id}`
         : `/app?task=${task.id}`
 
-      // Format due date
       const dueDateFormatted = dueDate.toLocaleDateString('ro-RO', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
       })
 
-      // Create notification
+      const crmLine = formatTaskCrmLine(task.contact, task.company)
+
       await prisma.notification.create({
         data: {
           userId: responsibleUser.id,
@@ -126,19 +133,19 @@ export async function POST(request: NextRequest) {
       })
       notificationsCreated++
 
-      // Send email if user has email
-      if (responsibleUser.email) {
+      if (!shouldDeferEmailForQuietHours(settings)) {
         const emailNotification = createTaskOverdueEmail(
           responsibleUser.name || responsibleUser.email,
           task.title,
           taskLink,
           daysOverdue,
           dueDateFormatted,
-          task.project?.name || null
+          task.project?.name || null,
+          crmLine
         )
         emailNotification.to = responsibleUser.email
-        await sendEmail(emailNotification)
-        emailsSent++
+        const sent = await sendEmail(emailNotification)
+        if (sent) emailsSent++
       }
     }
 
@@ -147,12 +154,9 @@ export async function POST(request: NextRequest) {
       tasksChecked: tasks.length,
       notificationsCreated,
       emailsSent,
+      skippedByPreference,
     })
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

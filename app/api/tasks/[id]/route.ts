@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { sendEmail, createTaskAssignedEmail, createTaskCompletedEmail } from '@/lib/email'
+import {
+  getEmailNotificationSettings,
+  shouldDeferEmailForQuietHours,
+} from '@/lib/emailNotificationSettings'
 import { z } from 'zod'
 
 const updateTaskSchema = z.object({
@@ -459,17 +463,18 @@ export async function PATCH(
 
         // Send email notifications
         for (const recipient of recipients) {
-          if (recipient.email) {
-            const emailNotification = createTaskCompletedEmail(
-              recipient.name || recipient.email,
-              completerName,
-              task.title,
-              taskLink,
-              projectName
-            )
-            emailNotification.to = recipient.email
-            await sendEmail(emailNotification)
-          }
+          if (!recipient.email?.trim()) continue
+          const prefs = await getEmailNotificationSettings(recipient.id)
+          if (!prefs.taskCompletedEmail || shouldDeferEmailForQuietHours(prefs)) continue
+          const emailNotification = createTaskCompletedEmail(
+            recipient.name || recipient.email,
+            completerName,
+            task.title,
+            taskLink,
+            projectName
+          )
+          emailNotification.to = recipient.email.trim()
+          await sendEmail(emailNotification)
         }
       }
     }

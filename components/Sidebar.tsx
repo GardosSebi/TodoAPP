@@ -293,10 +293,9 @@ export default function Sidebar() {
         setProjects(projects)
         throw new Error('Failed to reorder projects')
       }
-    } catch (error) {
+    } catch {
       // Revert on error
       setProjects(projects)
-      console.error('Error reordering projects:', error)
     }
   }
 

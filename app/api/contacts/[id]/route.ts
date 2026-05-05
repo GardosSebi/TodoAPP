@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { companyRowScope, contactRowScope, isCrmAdmin } from '@/lib/crmAccess'
+import { broadcastWorkspaceEmail } from '@/lib/workspaceEmail'
+import { createContactStatusChangeEmail } from '@/lib/email'
+import { formatContactStatus } from '@/lib/crmFormat'
 import { z } from 'zod'
 
 const updateContactSchema = z.object({
@@ -87,6 +90,9 @@ export async function PATCH(
       select: {
         id: true,
         workspaceId: true,
+        status: true,
+        first_name: true,
+        last_name: true,
       },
     })
 
@@ -133,6 +139,29 @@ export async function PATCH(
           description: `Status contact actualizat la ${data.status}`,
         },
       })
+    }
+
+    if (
+      data.status !== undefined &&
+      data.status !== existingContact.status
+    ) {
+      const newStatus = data.status
+      const displayName = `${contact.first_name} ${contact.last_name}`.trim()
+      const actorName = session.user.name || session.user.email || 'Cineva'
+      await broadcastWorkspaceEmail(
+        existingContact.workspaceId,
+        session.user.id,
+        'contactStatusChangeEmail',
+        (recipientName) =>
+          createContactStatusChangeEmail(
+            recipientName,
+            actorName,
+            displayName,
+            formatContactStatus(existingContact.status),
+            formatContactStatus(newStatus),
+            `/app/crm/contacts/${contact.id}`
+          )
+      )
     }
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useOptimistic, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import TaskItem from './TaskItem'
 import { Task } from '@/types'
@@ -20,11 +20,6 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
   useEffect(() => {
     setTasks(initialTasks)
   }, [initialTasks])
-
-  const [optimisticTasks, addOptimisticTask] = useOptimistic(
-    tasks,
-    (state, newTask: Task) => [...state, newTask]
-  )
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     // Optimistic update
@@ -56,7 +51,7 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? data.task : task))
       )
-    } catch (error) {
+    } catch {
       // Error updating task
     }
   }
@@ -93,64 +88,13 @@ export default function TaskList({ initialTasks, view, onTaskClick, onTaskUpdate
       window.dispatchEvent(new CustomEvent('taskDeleted', { 
         detail: { projectId } 
       }))
-    } catch (error) {
+    } catch {
       // Error deleting task
     }
   }
 
-  const handleTaskCreate = async (title: string, projectId?: string, priority: number = 0) => {
-    const tempId = `temp-${Date.now()}`
-    const newTask: Task = {
-      id: tempId,
-      title,
-      notes: null,
-      due_at: null,
-      priority: priority,
-      status: 'ACTIVE',
-      completed_at: null,
-      responsible: null,
-      projectId: projectId || null,
-      project: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      userId: '',
-    }
-
-    addOptimisticTask(newTask)
-
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          projectId: projectId || null,
-          priority: priority,
-        }),
-      })
-
-      if (!res.ok) {
-        setTasks((prev) => prev.filter((task) => task.id !== tempId))
-        throw new Error('Failed to create task')
-      }
-
-      const data = await res.json()
-      setTasks((prev) =>
-        prev.map((task) => (task.id === tempId ? data.task : task))
-      )
-      
-      // Dispatch event to notify sidebar to update task counts
-      window.dispatchEvent(new CustomEvent('taskCreated', { 
-        detail: { projectId: projectId || null } 
-      }))
-    } catch (error) {
-      // Error creating task
-      setTasks((prev) => prev.filter((task) => task.id !== tempId))
-    }
-  }
-
-  const activeTasks = optimisticTasks.filter((task) => task.status === 'ACTIVE')
-  const completedTasks = optimisticTasks.filter(
+  const activeTasks = tasks.filter((task) => task.status === 'ACTIVE')
+  const completedTasks = tasks.filter(
     (task) => task.status === 'COMPLETED'
   )
 

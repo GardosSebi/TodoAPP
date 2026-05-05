@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { companyRowScope, contactRowScope, dealRowScope, isCrmAdmin } from '@/lib/crmAccess'
+import { broadcastWorkspaceEmail } from '@/lib/workspaceEmail'
+import {
+  createDealStageChangeEmail,
+  createDealWonLostEmail,
+} from '@/lib/email'
+import { formatDealStage } from '@/lib/crmFormat'
 import { z } from 'zod'
 
 const updateDealSchema = z.object({
@@ -83,6 +89,8 @@ export async function PATCH(
       },
       select: {
         workspaceId: true,
+        stage: true,
+        title: true,
       },
     })
 
@@ -159,6 +167,42 @@ export async function PATCH(
           description: `Stadiu oportunitate actualizat la ${data.stage}`,
         },
       })
+    }
+
+    if (data.stage !== undefined && data.stage !== existingDeal.stage) {
+      const newStage = data.stage
+      const actorName = session.user.name || session.user.email || 'Cineva'
+      const dealLink = `/app/crm/deals/${deal.id}`
+      if (newStage === 'WON' || newStage === 'LOST') {
+        await broadcastWorkspaceEmail(
+          existingDeal.workspaceId,
+          session.user.id,
+          'dealWonLostEmail',
+          (recipientName) =>
+            createDealWonLostEmail(
+              recipientName,
+              actorName,
+              deal.title,
+              newStage,
+              dealLink
+            )
+        )
+      } else {
+        await broadcastWorkspaceEmail(
+          existingDeal.workspaceId,
+          session.user.id,
+          'dealStageChangeEmail',
+          (recipientName) =>
+            createDealStageChangeEmail(
+              recipientName,
+              actorName,
+              deal.title,
+              formatDealStage(existingDeal.stage),
+              formatDealStage(newStage),
+              dealLink
+            )
+        )
+      }
     }
 
     return NextResponse.json({

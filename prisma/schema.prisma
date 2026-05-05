@@ -89,10 +89,78 @@ model User {
   ownedDeals               Deal[]                @relation("DealOwner")
   crmNotes                 CRMNote[]
   interactions             Interaction[]
+  emailNotificationSettings EmailNotificationSettings?
+  passwordResetTokens      PasswordResetToken[]
 
   @@index([email])
   @@index([role])
   @@index([workspaceId])
+}
+
+/// One-time tokens for password reset emails (store hash only).
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  token_hash String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([userId])
+  @@index([expires_at])
+}
+
+/// Pending signup: user + workspace are created only after email verification link is used.
+model PendingRegistration {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String
+  password_hash String
+  token_hash    String   @unique
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  @@index([expires_at])
+}
+
+/// Per-user toggles for CRM / task email digests (cron + SMTP).
+model EmailNotificationSettings {
+  id        String @id @default(uuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  upcomingTaskEmail   Boolean @default(true)
+  upcomingHoursBefore Int     @default(24) // notify if due within this many hours
+
+  overdueTaskEmail Boolean @default(true)
+
+  dailyDigestEmail     Boolean @default(false)
+  digestHourUtc        Int     @default(7) // 0–23, server UTC; cron should run hourly and match
+  lastDailyDigestSentAt DateTime?
+
+  followUpReminderEmail Boolean @default(true)
+
+  inactiveContactEmail        Boolean @default(true)
+  inactiveContactDays         Int     @default(30)
+  lastInactiveContactsSentAt DateTime?
+
+  newContactEmail          Boolean @default(true)
+  contactStatusChangeEmail Boolean @default(true)
+  dealStageChangeEmail     Boolean @default(true)
+  dealClosingReminderEmail Boolean @default(true)
+  dealClosingDaysBefore    Int     @default(3)
+  dealWonLostEmail         Boolean @default(true)
+  crmNoteAddedEmail        Boolean @default(true)
+  taskCompletedEmail       Boolean @default(true)
+
+  /// Quiet hours in local server sense: 0–23. Null = feature off.
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Workspace {
