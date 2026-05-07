@@ -36,12 +36,27 @@ npm run db:generate
 npm run db:push
 ```
 
-## 5. Start Development Server
+## 5. Seed Demo Data (Todo + CRM)
+```bash
+npm run db:seed
+```
+
+Default seed login:
+- Email: `demo@todo-crm.local`
+- Password: `Demo12345!`
+
+Additional seeded users (same password):
+- `sales.alex@todo-crm.local`
+- `ops.bianca@todo-crm.local`
+
+For full details (what is seeded, overrides, and behavior), see `docs/SEED.md`.
+
+## 6. Start Development Server
 ```bash
 npm run dev
 ```
 
-## 6. Access the Application
+## 7. Access the Application
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## First Steps
